@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { APP_NAME } from '../constants';
 import { Avatar as AvatarType, Team } from '../types';
@@ -59,7 +60,7 @@ const RegisterPage: React.FC = () => {
             await register({ name, email, password, favoriteTeamId, avatar });
             navigate('/');
         } catch (err: any) {
-            if (err.message === 'auth/email-already-in-use') {
+            if (err.code === 'auth/email-already-in-use') {
                 setError('Este email ya está registrado. Intenta iniciar sesión.');
             } else {
                 setError('Ocurrió un error inesperado durante el registro.');
@@ -113,6 +114,11 @@ const RegisterPage: React.FC = () => {
                             className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-lg font-bold text-white bg-[var(--accent-red)] hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--background-medium)] focus:ring-[var(--accent-red)] disabled:opacity-50 transition-opacity">
                             {loading ? 'Creando cuenta...' : 'Finalizar Registro'}
                         </button>
+                    </div>
+                     <div className="text-center">
+                        <Link to="/login" className="text-sm text-[var(--accent-blue)] hover:opacity-80 transition-opacity">
+                            ¿Ya tienes cuenta? Inicia sesión
+                        </Link>
                     </div>
                 </form>
             </div>

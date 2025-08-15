@@ -337,12 +337,12 @@ const CalendarManagement: React.FC = () => {
         handleCancel();
     };
 
-    const handleSeed = async () => {
-        if (window.confirm("¿Estás seguro? Esto reemplazará todos los equipos, pilotos y el calendario con los datos de prueba iniciales. Esta acción no se puede deshacer.")) {
+    const handleResetAndSeed = async () => {
+        if (window.confirm("¿Estás seguro? Esto reemplazará los equipos, pilotos, calendario y usuarios de prueba en Firebase con los datos iniciales. Esta acción no se puede deshacer.")) {
             setLoading(true);
             try {
-                await db.seedDatabase();
-                alert("Base de datos inicializada con éxito.");
+                await db.seedFirebase();
+                alert("Base de datos de Firebase inicializada con éxito.");
                 await loadData();
             } catch (error) {
                 alert(`Error al inicializar la base de datos: ${error}`);
@@ -373,8 +373,8 @@ const CalendarManagement: React.FC = () => {
         <div className="bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)]">
             <h2 className="text-2xl font-bold f1-red-text mb-4">Gestión de Calendario</h2>
             <div className="mb-4 space-x-4">
-                <button onClick={handleSeed} disabled={loading} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 transition-colors">
-                    {loading ? 'Inicializando...' : 'Inicializar Base de Datos (Seed)'}
+                <button onClick={handleResetAndSeed} disabled={loading} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 transition-colors">
+                    {loading ? 'Inicializando...' : 'Resetear y Sembrar Firebase'}
                 </button>
                  <button onClick={handleFetchFromAI} disabled={loading} className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 transition-colors">
                     {loading ? 'Cargando...' : 'Cargar Calendario 2025 con IA'}

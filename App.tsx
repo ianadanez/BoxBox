@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -29,7 +30,6 @@ const PrivateRoute: React.FC<{ children: React.ReactNode, adminOnly?: boolean }>
 
 
 const App: React.FC = () => {
-  // Seeding logic is now handled by db.ts on its first import.
   return (
     <AuthProvider>
         <HashRouter>

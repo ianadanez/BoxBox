@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -20,9 +21,9 @@ const LoginPage: React.FC = () => {
         await login(email, password);
         navigate('/');
     } catch (err: any) {
-        if (err.message === 'auth/user-not-found') {
-            setError('No se encontró ningún usuario con ese email.');
-        } else if (err.message === 'auth/wrong-password') {
+        if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+            setError('Credenciales inválidas. Revisa el email y la contraseña.');
+        } else if (err.code === 'auth/wrong-password') {
             setError('La contraseña es incorrecta.');
         } else {
             setError('Ocurrió un error inesperado al iniciar sesión.');

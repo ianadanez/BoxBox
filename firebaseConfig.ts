@@ -15,6 +15,7 @@ const firebaseConfig = {
   storageBucket: 'f1prode-58763.firebasestorage.app',
   messagingSenderId: '452234982033',
   appId: '1:452234982033:web:e26c4f3d02c20a68fb4530'
+  measurementId: "G-4GV8G7VESP"
 }
 
 // Evita doble init con HMR
@@ -23,7 +24,6 @@ export const app = getApps().length ? getApp() : initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 export const firestoreDb = initializeFirestore(app, {
   experimentalAutoDetectLongPolling: true, // o experimentalForceLongPolling: true
-  useFetchStreams: false,
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
 })
 
