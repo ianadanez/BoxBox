@@ -1,0 +1,5 @@
+{
+  "name": "BoxBox",
+  "description": "An F1 prediction game where users forecast Grand Prix outcomes, competing in a general leaderboard and private tournaments. Features automated result fetching via AI, admin management, and a user profile with a simple avatar creator.",
+  "requestFramePermissions": []
+}

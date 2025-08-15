@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BoxBox</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root {
+        --background-dark: #0A0A0A;
+        --background-medium: #18181B;
+        --background-light: #27272A;
+        --border-color: #3f3f46;
+        --text-primary: #F4F4F5;
+        --text-secondary: #A1A1AA;
+        --accent-red: #E10600;
+        --accent-blue: #00D2FF;
+      }
+      body {
+        background-color: var(--background-dark);
+        color: var(--text-primary);
+        font-family: 'Poppins', sans-serif;
+        background-image: radial-gradient(circle at 10% 10%, rgba(225, 6, 0, 0.1), transparent 30%), radial-gradient(circle at 90% 80%, rgba(0, 210, 255, 0.1), transparent 30%);
+      }
+      .f1-red-text {
+        color: var(--accent-red);
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.1.1",
+    "react/": "https://esm.sh/react@^19.1.1/",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.1/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.13.0",
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.8.0",
+    "@firebase/app": "https://esm.sh/@firebase/app@^0.14.1",
+    "@firebase/auth": "https://esm.sh/@firebase/auth@^1.11.0",
+    "@firebase/firestore": "https://esm.sh/@firebase/firestore@^4.9.0",
+    "@firebase/functions": "https://esm.sh/@firebase/functions@^0.13.0",
+    "firebase-functions": "https://esm.sh/firebase-functions@^6.4.0",
+    "firebase-admin": "https://esm.sh/firebase-admin@^13.4.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./index.tsx"></script>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
