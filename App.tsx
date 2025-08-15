@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Header from './components/Header';
@@ -11,6 +11,9 @@ import AdminPage from './pages/AdminPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import SearchPage from './pages/SearchPage';
+import { db } from './services/db';
+import { collection, getDocs, query, limit } from '@firebase/firestore';
+import { firestoreDb } from './firebaseConfig';
 
 const PrivateRoute: React.FC<{ children: React.ReactNode, adminOnly?: boolean }> = ({ children, adminOnly = false }) => {
     const { user, loading } = useAuth();
@@ -30,6 +33,30 @@ const PrivateRoute: React.FC<{ children: React.ReactNode, adminOnly?: boolean }>
 
 
 const App: React.FC = () => {
+  useEffect(() => {
+    const checkAndSeedDatabase = async () => {
+      // Check a core collection like 'schedule' to see if it's empty
+      const scheduleCollectionRef = collection(firestoreDb, 'schedule');
+      const q = query(scheduleCollectionRef, limit(1));
+      const snapshot = await getDocs(q);
+
+      if (snapshot.empty) {
+        console.log('Database appears to be empty. Seeding initial data...');
+        try {
+          await db.seedDatabase();
+          console.log('Database seeded successfully. The app will now reload.');
+          // Reload to ensure all components fetch the newly seeded data
+          window.location.reload();
+        } catch (error) {
+          console.error('Error seeding the database:', error);
+          alert('Error: No se pudo inicializar la base de datos. Por favor, contacta al administrador.');
+        }
+      }
+    };
+
+    checkAndSeedDatabase();
+  }, []); // Run only once on initial mount
+
   return (
     <AuthProvider>
         <HashRouter>
