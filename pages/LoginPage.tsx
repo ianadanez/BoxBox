@@ -7,8 +7,7 @@ import { APP_NAME } from '../constants';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
-  // Password state is kept for UI consistency but not used in mock auth
-  const [password, setPassword] = useState('password'); 
+  const [password, setPassword] = useState(''); 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
@@ -20,11 +19,11 @@ const LoginPage: React.FC = () => {
     setLoading(true);
 
     try {
-        const success = await login(email);
+        const success = await login(email, password);
         if (success) {
           navigate('/');
         } else {
-            setError('El usuario no existe.');
+            setError('Email o contraseña incorrectos.');
         }
     } catch (err: any) {
         setError(err.message || 'Ocurrió un error.');
@@ -40,7 +39,7 @@ const LoginPage: React.FC = () => {
         <h2 className="text-xl text-center text-[var(--text-primary)]">Iniciar Sesión</h2>
         
         <div className="text-center text-sm text-[var(--text-secondary)] bg-[var(--background-light)] p-3 rounded-lg">
-            <p><strong>Modo de Prueba:</strong> No se necesita contraseña.</p>
+            <p><strong>Modo de Prueba:</strong> La contraseña para todas las cuentas de prueba es <strong>password</strong>.</p>
             <p>Puedes usar: <strong>admin@boxbox.com</strong> o <strong>user1@boxbox.com</strong>, etc.</p>
         </div>
 
@@ -58,6 +57,24 @@ const LoginPage: React.FC = () => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-3 py-2 text-white bg-[var(--background-light)] border border-[var(--border-color)] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-red)] focus:border-[var(--accent-red)]"
+              />
+            </div>
+          </div>
+
+           <div>
+            <label htmlFor="password" className="block text-sm font-medium text-[var(--text-secondary)]">
+              Contraseña
+            </label>
+            <div className="mt-1">
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2 text-white bg-[var(--background-light)] border border-[var(--border-color)] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-red)] focus:border-[var(--accent-red)]"
               />
             </div>

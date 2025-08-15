@@ -3,10 +3,20 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { User, Avatar } from '../types';
 import { db } from '../services/db';
+import { auth } from '../firebaseConfig';
+import { 
+    createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword, 
+    signOut, 
+    onAuthStateChanged,
+    User as FirebaseUser
+} from '@firebase/auth';
+
 
 interface RegisterDetails {
   name: string;
   email: string;
+  password: string;
   favoriteTeamId: string;
   avatar: Avatar;
 }
@@ -28,35 +38,41 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const checkUserSession = async () => {
-        try {
-            const storedUserId = localStorage.getItem('boxbox_user_id');
-            if (storedUserId) {
-                const userProfile = await db.getUserById(storedUserId);
-                if (userProfile) {
-                    setUser(userProfile);
-                }
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+        if (firebaseUser) {
+            // User is signed in, see docs for a list of available properties
+            // https://firebase.google.com/docs/reference/js/firebase.User
+            try {
+                 const userProfile = await db.getUserById(firebaseUser.uid);
+                 if (userProfile) {
+                     setUser(userProfile);
+                 } else {
+                     // This case might happen if the user exists in Auth but not in Firestore DB.
+                     // You might want to create a profile here or log them out.
+                     console.warn("User exists in Firebase Auth but not in Firestore. Logging out.");
+                     await signOut(auth);
+                     setUser(null);
+                 }
+            } catch (error) {
+                console.error("Error fetching user profile:", error);
+                setUser(null);
             }
-        } catch (error) {
-            console.error("Failed to restore session:", error);
-            localStorage.removeItem('boxbox_user_id');
-        } finally {
-            setLoading(false);
+        } else {
+            // User is signed out
+            setUser(null);
         }
-    }
-    checkUserSession();
+        setLoading(false);
+    });
+
+    return () => unsubscribe(); // Cleanup subscription on unmount
   }, []);
 
-  const login = async (email: string, password?: string): Promise<boolean> => {
+  const login = async (email: string, password = "password"): Promise<boolean> => {
+    // Password is required for Firebase auth, but we can use a dummy one for this project's scope.
     setLoading(true);
     try {
-        const userProfile = await db.getUserByEmail(email);
-        if (userProfile) {
-            setUser(userProfile);
-            localStorage.setItem('boxbox_user_id', userProfile.id);
-            return true;
-        }
-        return false;
+        await signInWithEmailAndPassword(auth, email, password);
+        return true;
     } catch(error) {
         console.error("Login failed:", error);
         return false;
@@ -68,14 +84,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const register = async (details: RegisterDetails): Promise<boolean> => {
     setLoading(true);
     try {
-        const existingUser = await db.getUserByEmail(details.email);
-        if (existingUser) {
-            console.error("Registration failed: Email already in use.");
-            return false;
-        }
+        // Step 1: Create user in Firebase Authentication
+        const userCredential = await createUserWithEmailAndPassword(auth, details.email, details.password);
+        const firebaseUser = userCredential.user;
 
+        // Step 2: Create user profile in Firestore
         const newUser: User = {
-            id: `user_${Date.now()}`,
+            id: firebaseUser.uid, // Use the UID from Auth as the document ID
             name: details.name,
             email: details.email,
             role: 'user',
@@ -85,8 +100,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         };
 
         await db.saveUser(newUser);
-        setUser(newUser);
-        localStorage.setItem('boxbox_user_id', newUser.id);
+        
+        // The onAuthStateChanged listener will automatically set the user state.
         return true;
 
     } catch(error) {
@@ -98,14 +113,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const logout = async () => {
-    setUser(null);
-    localStorage.removeItem('boxbox_user_id');
-    return Promise.resolve();
+    await signOut(auth);
+    // The onAuthStateChanged listener will handle setting user to null.
   };
   
   const updateUser = async (updatedUser: User) => {
       await db.saveUser(updatedUser);
-      setUser(updatedUser);
+      setUser(updatedUser); // Optimistically update local state
   };
 
   return (

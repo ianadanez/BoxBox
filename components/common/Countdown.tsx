@@ -1,12 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 interface CountdownProps {
   targetDate: string;
 }
 
 const Countdown: React.FC<CountdownProps> = ({ targetDate }) => {
-  const calculateTimeLeft = () => {
+  const calculateTimeLeft = useCallback(() => {
     const difference = +new Date(targetDate) - +new Date();
     let timeLeft = {
         días: 0,
@@ -24,23 +24,28 @@ const Countdown: React.FC<CountdownProps> = ({ targetDate }) => {
       };
     }
     return timeLeft;
-  };
+  }, [targetDate]);
 
-  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
+  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft);
 
   useEffect(() => {
+    const isFinished = Object.values(timeLeft).every(v => v === 0);
+    if (isFinished) {
+        return; // Stop the timer
+    }
+
     const timer = setTimeout(() => {
       setTimeLeft(calculateTimeLeft());
     }, 1000);
 
     return () => clearTimeout(timer);
-  });
+  }, [timeLeft, calculateTimeLeft]);
 
   const timerComponents: React.ReactNode[] = [];
 
   Object.keys(timeLeft).forEach((interval) => {
     const value = timeLeft[interval as keyof typeof timeLeft];
-    if (value > 0 || Object.keys(timerComponents).length > 0 || interval === 'segundos') {
+    if (value > 0 || timerComponents.length > 0 || interval === 'segundos') {
       timerComponents.push(
         <div key={interval} className="flex flex-col items-center mx-2">
             <span className="text-3xl md:text-5xl font-semibold text-[var(--text-primary)] tabular-nums">{String(value).padStart(2, '0')}</span>

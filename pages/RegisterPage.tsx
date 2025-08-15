@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -19,7 +20,7 @@ const getRandomAvatar = (): AvatarType => ({
 const RegisterPage: React.FC = () => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('password'); // Not used in mock auth, but kept for UI
+    const [password, setPassword] = useState('');
     const [favoriteTeamId, setFavoriteTeamId] = useState('');
     const [avatar, setAvatar] = useState<AvatarType>(getRandomAvatar());
     const [teams, setTeams] = useState<Team[]>([]);
@@ -44,7 +45,7 @@ const RegisterPage: React.FC = () => {
         e.preventDefault();
         setError('');
         
-        if (!name || !email || !favoriteTeamId) {
+        if (!name || !email || !password || !favoriteTeamId) {
             setError("Todos los campos son requeridos.");
             return;
         }
@@ -52,11 +53,11 @@ const RegisterPage: React.FC = () => {
         setLoading(true);
 
         try {
-            const success = await register({ name, email, favoriteTeamId, avatar });
+            const success = await register({ name, email, password, favoriteTeamId, avatar });
             if (success) {
                 navigate('/');
             } else {
-                setError('El email ya está en uso.');
+                setError('El email ya está en uso. Intenta con otro.');
             }
         } catch (err: any) {
             setError(err.message || 'Ocurrió un error durante el registro.');
@@ -83,10 +84,10 @@ const RegisterPage: React.FC = () => {
                                 className="mt-1 w-full px-3 py-2 text-white bg-[var(--background-light)] border border-[var(--border-color)] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-red)] focus:border-[var(--accent-red)]" />
                         </div>
                         <div>
-                            <label htmlFor="password_mock" className="block text-sm font-medium text-[var(--text-secondary)]">Contraseña</label>
-                            <input id="password_mock" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} disabled
-                                className="mt-1 w-full px-3 py-2 text-gray-400 bg-[var(--background-light)] border border-[var(--border-color)] rounded-md shadow-sm disabled:opacity-50" />
-                            <p className="text-xs text-[var(--text-secondary)] mt-1">La contraseña no es necesaria en modo de prueba.</p>
+                            <label htmlFor="password" className="block text-sm font-medium text-[var(--text-secondary)]">Contraseña</label>
+                            <input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
+                                className="mt-1 w-full px-3 py-2 text-white bg-[var(--background-light)] border border-[var(--border-color)] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-red)] focus:border-[var(--accent-red)]" />
+                            <p className="text-xs text-[var(--text-secondary)] mt-1">Para modo de prueba, puedes usar "password".</p>
                         </div>
                          <div>
                             <label htmlFor="favoriteTeamId" className="block text-sm font-medium text-[var(--text-secondary)]">Escudería Favorita</label>
