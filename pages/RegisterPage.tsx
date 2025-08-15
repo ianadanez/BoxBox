@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -49,18 +47,24 @@ const RegisterPage: React.FC = () => {
             setError("Todos los campos son requeridos.");
             return;
         }
+
+        if (password.length < 6) {
+            setError("La contraseña debe tener al menos 6 caracteres.");
+            return;
+        }
         
         setLoading(true);
 
         try {
-            const success = await register({ name, email, password, favoriteTeamId, avatar });
-            if (success) {
-                navigate('/');
-            } else {
-                setError('El email ya está en uso. Intenta con otro.');
-            }
+            await register({ name, email, password, favoriteTeamId, avatar });
+            navigate('/');
         } catch (err: any) {
-            setError(err.message || 'Ocurrió un error durante el registro.');
+            if (err.message === 'auth/email-already-in-use') {
+                setError('Este email ya está registrado. Intenta iniciar sesión.');
+            } else {
+                setError('Ocurrió un error inesperado durante el registro.');
+            }
+            console.error(err);
         } finally {
             setLoading(false);
         }
@@ -87,7 +91,7 @@ const RegisterPage: React.FC = () => {
                             <label htmlFor="password" className="block text-sm font-medium text-[var(--text-secondary)]">Contraseña</label>
                             <input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
                                 className="mt-1 w-full px-3 py-2 text-white bg-[var(--background-light)] border border-[var(--border-color)] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-red)] focus:border-[var(--accent-red)]" />
-                            <p className="text-xs text-[var(--text-secondary)] mt-1">Para modo de prueba, puedes usar "password".</p>
+                            <p className="text-xs text-[var(--text-secondary)] mt-1">Debe tener al menos 6 caracteres.</p>
                         </div>
                          <div>
                             <label htmlFor="favoriteTeamId" className="block text-sm font-medium text-[var(--text-secondary)]">Escudería Favorita</label>

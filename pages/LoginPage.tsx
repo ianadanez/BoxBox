@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -19,14 +17,15 @@ const LoginPage: React.FC = () => {
     setLoading(true);
 
     try {
-        const success = await login(email, password);
-        if (success) {
-          navigate('/');
-        } else {
-            setError('Email o contraseña incorrectos.');
-        }
+        await login(email, password);
+        navigate('/');
     } catch (err: any) {
-        setError(err.message || 'Ocurrió un error.');
+        if (err.message === 'auth/invalid-credential') {
+            setError('El email o la contraseña son incorrectos.');
+        } else {
+            setError('Ocurrió un error inesperado al iniciar sesión.');
+        }
+        console.error(err);
     } finally {
         setLoading(false);
     }

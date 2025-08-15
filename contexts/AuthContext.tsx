@@ -1,17 +1,6 @@
-
-
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { User, Avatar } from '../types';
 import { db } from '../services/db';
-import { auth } from '../firebaseConfig';
-import { 
-    createUserWithEmailAndPassword, 
-    signInWithEmailAndPassword, 
-    signOut, 
-    onAuthStateChanged,
-    User as FirebaseUser
-} from '@firebase/auth';
-
 
 interface RegisterDetails {
   name: string;
@@ -24,9 +13,9 @@ interface RegisterDetails {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password?: string) => Promise<boolean>;
+  login: (email: string, password?: string) => Promise<void>;
   logout: () => Promise<void>;
-  register: (details: RegisterDetails) => Promise<boolean>;
+  register: (details: RegisterDetails) => Promise<void>;
   updateUser: (user: User) => void;
   isAuthenticated: boolean;
 }
@@ -38,61 +27,60 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-        if (firebaseUser) {
-            // User is signed in, see docs for a list of available properties
-            // https://firebase.google.com/docs/reference/js/firebase.User
+    // Check for a logged-in user in session storage on startup
+    const checkLoggedInUser = async () => {
+        const userId = sessionStorage.getItem('userId');
+        if (userId) {
             try {
-                 const userProfile = await db.getUserById(firebaseUser.uid);
-                 if (userProfile) {
-                     setUser(userProfile);
-                 } else {
-                     // This case might happen if the user exists in Auth but not in Firestore DB.
-                     // You might want to create a profile here or log them out.
-                     console.warn("User exists in Firebase Auth but not in Firestore. Logging out.");
-                     await signOut(auth);
-                     setUser(null);
-                 }
+                const userProfile = await db.getUserById(userId);
+                if (userProfile) {
+                    setUser(userProfile);
+                } else {
+                    sessionStorage.removeItem('userId');
+                }
             } catch (error) {
-                console.error("Error fetching user profile:", error);
-                setUser(null);
+                console.error("Error fetching user profile from local DB:", error);
             }
-        } else {
-            // User is signed out
-            setUser(null);
         }
         setLoading(false);
-    });
-
-    return () => unsubscribe(); // Cleanup subscription on unmount
+    };
+    checkLoggedInUser();
   }, []);
 
-  const login = async (email: string, password = "password"): Promise<boolean> => {
-    // Password is required for Firebase auth, but we can use a dummy one for this project's scope.
+  const login = async (email: string, password = "password"): Promise<void> => {
     setLoading(true);
     try {
-        await signInWithEmailAndPassword(auth, email, password);
-        return true;
+        const userProfile = await db.getUserByEmail(email);
+        
+        // In this local-only version, we accept a hardcoded password for simplicity.
+        if (userProfile && userProfile.password === password) {
+            setUser(userProfile);
+            sessionStorage.setItem('userId', userProfile.id);
+        } else {
+            // Throw an error with a message that mimics Firebase for component compatibility
+            throw new Error('auth/invalid-credential');
+        }
     } catch(error) {
         console.error("Login failed:", error);
-        return false;
+        throw error;
     } finally {
         setLoading(false);
     }
   };
 
-  const register = async (details: RegisterDetails): Promise<boolean> => {
+  const register = async (details: RegisterDetails): Promise<void> => {
     setLoading(true);
     try {
-        // Step 1: Create user in Firebase Authentication
-        const userCredential = await createUserWithEmailAndPassword(auth, details.email, details.password);
-        const firebaseUser = userCredential.user;
+        const existingUser = await db.getUserByEmail(details.email);
+        if (existingUser) {
+            throw new Error('auth/email-already-in-use');
+        }
 
-        // Step 2: Create user profile in Firestore
         const newUser: User = {
-            id: firebaseUser.uid, // Use the UID from Auth as the document ID
+            id: crypto.randomUUID(),
             name: details.name,
             email: details.email,
+            password: details.password, // Storing plaintext password, for demo only
             role: 'user',
             avatar: details.avatar,
             favoriteTeamId: details.favoriteTeamId,
@@ -100,21 +88,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         };
 
         await db.saveUser(newUser);
-        
-        // The onAuthStateChanged listener will automatically set the user state.
-        return true;
+        setUser(newUser);
+        sessionStorage.setItem('userId', newUser.id);
 
     } catch(error) {
         console.error("Registration failed:", error);
-        return false;
+        throw error;
     } finally {
         setLoading(false);
     }
   };
 
   const logout = async () => {
-    await signOut(auth);
-    // The onAuthStateChanged listener will handle setting user to null.
+    setUser(null);
+    sessionStorage.removeItem('userId');
   };
   
   const updateUser = async (updatedUser: User) => {

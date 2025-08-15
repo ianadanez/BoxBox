@@ -1,8 +1,8 @@
-
 export interface User {
   id: string;
   name: string;
   email: string; // Used as a unique identifier for login
+  password?: string; // Stored plaintext for local demo. DO NOT USE IN PRODUCTION.
   role: 'user' | 'admin';
   avatar: Avatar;
   favoriteTeamId?: string;

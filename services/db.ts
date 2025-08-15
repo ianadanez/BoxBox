@@ -1,284 +1,355 @@
-
-
-import { collection, doc, getDoc, getDocs, setDoc, addDoc, query, where, writeBatch, orderBy, limit } from '@firebase/firestore';
-import { firestoreDb } from '../firebaseConfig';
 import { User, Team, Driver, GrandPrix, Prediction, OfficialResult, Result, Tournament, Score, SeasonTotal, PointAdjustment, Notification, PokeNotification, TournamentInviteNotification, ResultsNotification, PointsAdjustmentNotification, TournamentInviteAcceptedNotification, TournamentInviteDeclinedNotification } from '../types';
 import { TEAMS, DRIVERS, GP_SCHEDULE, SCORING_RULES } from '../constants';
 
-// Collection references
-const usersRef = collection(firestoreDb, 'users');
-const teamsRef = collection(firestoreDb, 'teams');
-const driversRef = collection(firestoreDb, 'drivers');
-const scheduleRef = collection(firestoreDb, 'schedule');
-const predictionsRef = collection(firestoreDb, 'predictions');
-const resultsRef = collection(firestoreDb, 'results');
-const tournamentsRef = collection(firestoreDb, 'tournaments');
-const pointAdjustmentsRef = collection(firestoreDb, 'pointAdjustments');
-const notificationsRef = collection(firestoreDb, 'notifications');
+// --- Local Storage Wrapper ---
+const getData = <T>(key: string, defaultValue: T): T => {
+    try {
+        const storedValue = localStorage.getItem(key);
+        if (storedValue) {
+            return JSON.parse(storedValue);
+        }
+    } catch (error) {
+        console.error(`Error reading from localStorage for key "${key}":`, error);
+    }
+    return defaultValue;
+};
 
+const saveData = <T>(key: string, value: T): void => {
+    try {
+        localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+        console.error(`Error writing to localStorage for key "${key}":`, error);
+    }
+};
 
+// --- Initial Data Seeding ---
+const seedDatabase = (): void => {
+    if (!localStorage.getItem('seeded')) {
+        console.log("Database appears to be empty. Seeding initial data into localStorage...");
+        const adminUser: User = {
+            id: 'admin-user-id',
+            name: 'Admin',
+            email: 'admin@boxbox.com',
+            password: 'password', // Unsafe, for demo only
+            role: 'admin',
+            avatar: { color: '#E10600', secondaryColor: '#FFFFFF', skinColor: '#D0A17D', eyes: 'laser', pattern: 'carbon' },
+            favoriteTeamId: 'ferrari',
+            createdAt: new Date().toISOString()
+        };
+        const testUser1: User = {
+            id: 'test-user-1-id',
+            name: 'Carlos',
+            email: 'user1@boxbox.com',
+            password: 'password',
+            role: 'user',
+            avatar: { color: '#F91536', secondaryColor: '#FFEB00', skinColor: '#C68642', eyes: 'determined', pattern: 'flames' },
+            favoriteTeamId: 'ferrari',
+            createdAt: new Date().toISOString()
+        };
+        const testUser2: User = {
+            id: 'test-user-2-id',
+            name: 'Lando',
+            email: 'user2@boxbox.com',
+            password: 'password',
+            role: 'user',
+            avatar: { color: '#F58020', secondaryColor: '#00D2FF', skinColor: '#E6A86F', eyes: 'wink', pattern: 'halftone' },
+            favoriteTeamId: 'mclaren',
+            createdAt: new Date().toISOString()
+        };
+
+        saveData<User[]>('users', [adminUser, testUser1, testUser2]);
+        saveData<Team[]>('teams', TEAMS);
+        saveData<Driver[]>('drivers', DRIVERS);
+        saveData<GrandPrix[]>('schedule', GP_SCHEDULE);
+        saveData<Prediction[]>('predictions', []);
+        saveData<OfficialResult[]>('results', []);
+        saveData<Tournament[]>('tournaments', []);
+        saveData<PointAdjustment[]>('pointAdjustments', []);
+        saveData<Notification[]>('notifications', []);
+        
+        localStorage.setItem('seeded', 'true');
+        console.log('Seeding complete.');
+    }
+};
+
+seedDatabase(); // Run on initial load
+
+// --- DB Service Implementation ---
 export const db = {
   // Users
-  getUsers: async (): Promise<User[]> => {
-    const snapshot = await getDocs(usersRef);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-  },
+  getUsers: async (): Promise<User[]> => getData<User[]>('users', []),
   getUserByEmail: async (email: string): Promise<User | undefined> => {
-    const q = query(usersRef, where("email", "==", email));
-    const snapshot = await getDocs(q);
-    if (snapshot.empty) return undefined;
-    const doc = snapshot.docs[0];
-    return { id: doc.id, ...doc.data() } as User;
+      const users = await db.getUsers();
+      return users.find(u => u.email === email);
   },
   getUserById: async (id: string): Promise<User | undefined> => {
-    const docRef = doc(firestoreDb, 'users', id);
-    const docSnap = await getDoc(docRef);
-    if (!docSnap.exists()) return undefined;
-    return { id: docSnap.id, ...docSnap.data() } as User;
+      const users = await db.getUsers();
+      return users.find(u => u.id === id);
   },
   saveUser: async (user: User): Promise<void> => {
-    const { id, ...userData } = user;
-    await setDoc(doc(firestoreDb, 'users', id), userData);
+      const users = await db.getUsers();
+      const index = users.findIndex(u => u.id === user.id);
+      if (index > -1) {
+          users[index] = user;
+      } else {
+          users.push(user);
+      }
+      saveData('users', users);
   },
 
   // Catalogue
-  getTeams: async (): Promise<Team[]> => {
-    const snapshot = await getDocs(teamsRef);
-    if (snapshot.empty) return TEAMS; // Fallback to constants if collection is empty
-    return snapshot.docs.map(doc => doc.data() as Team);
-  },
+  getTeams: async (): Promise<Team[]> => getData('teams', TEAMS),
   getDrivers: async (activeOnly = false): Promise<Driver[]> => {
-    let q = query(collection(firestoreDb, 'drivers'));
-    if (activeOnly) {
-        q = query(q, where("isActive", "==", true));
-    }
-    const snapshot = await getDocs(q);
-    if (snapshot.empty) return DRIVERS.filter(d => activeOnly ? d.isActive : true); // Fallback
-    return snapshot.docs.map(doc => doc.data() as Driver);
+      const drivers = getData('drivers', DRIVERS);
+      return activeOnly ? drivers.filter(d => d.isActive) : drivers;
   },
   saveDriver: async (driver: Driver): Promise<void> => {
-    await setDoc(doc(firestoreDb, 'drivers', driver.id), driver, { merge: true });
+      const drivers = await db.getDrivers();
+      const index = drivers.findIndex(d => d.id === driver.id);
+      if (index > -1) {
+          drivers[index] = driver;
+      } else {
+          drivers.push(driver);
+      }
+      saveData('drivers', drivers);
   },
-  getSchedule: async (): Promise<GrandPrix[]> => {
-    const q = query(scheduleRef, orderBy("id"));
-    const snapshot = await getDocs(q);
-    if (snapshot.empty) return GP_SCHEDULE; // Fallback
-    return snapshot.docs.map(doc => doc.data() as GrandPrix).sort((a,b) => a.id - b.id);
-  },
+  getSchedule: async (): Promise<GrandPrix[]> => getData('schedule', GP_SCHEDULE),
   saveGp: async (gp: GrandPrix): Promise<void> => {
-     await setDoc(doc(firestoreDb, 'schedule', String(gp.id)), gp, { merge: true });
+      const schedule = await db.getSchedule();
+      const index = schedule.findIndex(g => g.id === gp.id);
+      if (index > -1) {
+          schedule[index] = gp;
+      } else {
+          schedule.push(gp);
+      }
+      saveData('schedule', schedule.sort((a,b) => a.id - b.id));
   },
   replaceSchedule: async (newSchedule: GrandPrix[]): Promise<void> => {
-      const batch = writeBatch(firestoreDb);
-      newSchedule.forEach(gp => {
-          const docRef = doc(firestoreDb, 'schedule', String(gp.id));
-          batch.set(docRef, gp);
-      });
-      await batch.commit();
+      saveData('schedule', newSchedule);
   },
 
   // Predictions
   getPrediction: async (userId: string, gpId: number): Promise<Prediction | undefined> => {
-    const q = query(predictionsRef, where("userId", "==", userId), where("gpId", "==", gpId));
-    const snapshot = await getDocs(q);
-    if (snapshot.empty) return undefined;
-    return snapshot.docs[0].data() as Prediction;
+      const predictions = getData<Prediction[]>('predictions', []);
+      return predictions.find(p => p.userId === userId && p.gpId === gpId);
   },
   savePrediction: async (prediction: Prediction): Promise<void> => {
-    const { userId, gpId } = prediction;
-    const docId = `${userId}_${gpId}`;
-    const predToSave = { ...prediction, submittedAt: new Date().toISOString() };
-    await setDoc(doc(predictionsRef, docId), predToSave, { merge: true });
+      const predictions = getData<Prediction[]>('predictions', []);
+      const predToSave = { ...prediction, submittedAt: new Date().toISOString() };
+      const index = predictions.findIndex(p => p.userId === prediction.userId && p.gpId === prediction.gpId);
+      if (index > -1) {
+          predictions[index] = predToSave;
+      } else {
+          predictions.push(predToSave);
+      }
+      saveData('predictions', predictions);
   },
   
   // Results
   getDraftResult: async (gpId: number): Promise<Result | undefined> => {
-    const docRef = doc(firestoreDb, 'results', `draft_${gpId}`);
-    const docSnap = await getDoc(docRef);
-    return docSnap.exists() ? docSnap.data() as Result : undefined;
+    const drafts = getData<{[key: number]: Result}>('draft_results', {});
+    return drafts[gpId];
   },
   saveDraftResult: async (result: Result): Promise<void> => {
-    await setDoc(doc(firestoreDb, 'results', `draft_${result.gpId}`), result);
+    const drafts = getData<{[key: number]: Result}>('draft_results', {});
+    drafts[result.gpId] = result;
+    saveData('draft_results', drafts);
   },
   getOfficialResult: async (gpId: number): Promise<OfficialResult | undefined> => {
-    const docRef = doc(firestoreDb, 'results', `official_${gpId}`);
-    const docSnap = await getDoc(docRef);
-    return docSnap.exists() ? docSnap.data() as OfficialResult : undefined;
+      const results = await db.getOfficialResults();
+      return results.find(r => r.gpId === gpId);
   },
-  getOfficialResults: async (): Promise<OfficialResult[]> => {
-    const q = query(resultsRef, where("publishedAt", "!=", null));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => doc.data() as OfficialResult);
-  },
+  getOfficialResults: async (): Promise<OfficialResult[]> => getData('results', []),
   publishResult: async (result: OfficialResult): Promise<void> => {
+     const results = await db.getOfficialResults();
      const resultToSave = { ...result, publishedAt: new Date().toISOString() };
-     await setDoc(doc(firestoreDb, 'results', `official_${result.gpId}`), resultToSave, { merge: true });
+     const index = results.findIndex(r => r.gpId === result.gpId);
+     if (index > -1) {
+         results[index] = resultToSave;
+     } else {
+         results.push(resultToSave);
+     }
+     saveData('results', results);
      
-     // Create notifications
      const schedule = await db.getSchedule();
      const gp = schedule.find(g => g.id === result.gpId);
-     const q = query(predictionsRef, where("gpId", "==", result.gpId));
-     const usersWhoPredictedSnapshot = await getDocs(q);
-     
-     const batch = writeBatch(firestoreDb);
-     usersWhoPredictedSnapshot.docs.forEach(predDoc => {
-         const userId = predDoc.data().userId;
-         const notifRef = doc(collection(firestoreDb, 'notifications'));
-         const notification: Omit<ResultsNotification, 'id'> = {
+     const allPredictions = getData<Prediction[]>('predictions', []);
+     const usersWhoPredicted = [...new Set(allPredictions.filter(p => p.gpId === result.gpId).map(p => p.userId))];
+
+     const notifications = getData<Notification[]>('notifications', []);
+     usersWhoPredicted.forEach(userId => {
+         const notification: ResultsNotification = {
+             id: crypto.randomUUID(),
              toUserId: userId, type: 'results',
              gpId: result.gpId, gpName: gp?.name || 'una carrera',
              timestamp: new Date().toISOString(), seen: false
          };
-         batch.set(notifRef, notification);
+         notifications.push(notification);
      });
-     await batch.commit();
+     saveData('notifications', notifications);
   },
 
   // Tournaments
-  getTournaments: async (): Promise<Tournament[]> => {
-    const snapshot = await getDocs(tournamentsRef);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
-  },
+  getTournaments: async (): Promise<Tournament[]> => getData('tournaments', []),
   saveTournament: async (tournament: Tournament): Promise<void> => {
-      const { id, ...tourneyData } = tournament;
-      await setDoc(doc(tournamentsRef, id), tourneyData, { merge: true });
+      const tournaments = await db.getTournaments();
+      const index = tournaments.findIndex(t => t.id === tournament.id);
+      if (index > -1) {
+          tournaments[index] = tournament;
+      } else {
+          tournaments.push(tournament);
+      }
+      saveData('tournaments', tournaments);
   },
-  addTournament: async (data: Omit<Tournament, 'id'| 'pendingMemberIds'>): Promise<Tournament> => {
-      const newTournamentData = { ...data, pendingMemberIds: [] };
-      const docRef = await addDoc(tournamentsRef, newTournamentData);
-      return { id: docRef.id, ...newTournamentData };
+  addTournament: async (data: Omit<Tournament, 'id' | 'pendingMemberIds'>): Promise<Tournament> => {
+      const tournaments = await db.getTournaments();
+      const newTournament: Tournament = {
+          id: crypto.randomUUID(),
+          ...data,
+          pendingMemberIds: [],
+      };
+      tournaments.push(newTournament);
+      saveData('tournaments', tournaments);
+      return newTournament;
   },
   findTournamentByCode: async (code: string): Promise<Tournament | undefined> => {
-      const q = query(tournamentsRef, where("inviteCode", "==", code));
-      const snapshot = await getDocs(q);
-      if (snapshot.empty) return undefined;
-      const doc = snapshot.docs[0];
-      return { id: doc.id, ...doc.data() } as Tournament;
+      const tournaments = await db.getTournaments();
+      return tournaments.find(t => t.inviteCode === code);
   },
 
   // Point Adjustments
   getPointAdjustments: async (): Promise<PointAdjustment[]> => {
-    const q = query(pointAdjustmentsRef, orderBy("timestamp", "desc"));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PointAdjustment));
+      const adjustments = getData<PointAdjustment[]>('pointAdjustments', []);
+      return adjustments.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   },
   addPointAdjustment: async (data: Omit<PointAdjustment, 'id' | 'timestamp'>): Promise<PointAdjustment> => {
-      const newAdjustmentData = { ...data, timestamp: new Date().toISOString() };
-      const docRef = await addDoc(pointAdjustmentsRef, newAdjustmentData);
+      const adjustments = await db.getPointAdjustments();
+      const newAdjustment: PointAdjustment = {
+          id: crypto.randomUUID(),
+          ...data,
+          timestamp: new Date().toISOString()
+      };
+      adjustments.push(newAdjustment);
+      saveData('pointAdjustments', adjustments);
       
-      const notifRef = doc(notificationsRef);
-      const notification: Omit<PointsAdjustmentNotification, 'id'> = {
+      const notifications = getData<Notification[]>('notifications', []);
+      const notification: PointsAdjustmentNotification = {
+          id: crypto.randomUUID(),
           toUserId: data.userId, type: 'points_adjustment', points: data.points,
           reason: data.reason, adminId: data.adminId, timestamp: new Date().toISOString(), seen: false
       };
-      await setDoc(notifRef, notification);
+      notifications.push(notification);
+      saveData('notifications', notifications);
       
-      return { id: docRef.id, ...newAdjustmentData };
+      return newAdjustment;
   },
 
   // Notifications
   getExistingUnseenPoke: async (fromUserId: string, toUserId: string): Promise<PokeNotification | undefined> => {
-    const q = query(notificationsRef, 
-      where('type', '==', 'poke'),
-      where('fromUserId', '==', fromUserId),
-      where('toUserId', '==', toUserId),
-      where('seen', '==', false),
-      limit(1)
-    );
-    const snapshot = await getDocs(q);
-    if (snapshot.empty) return undefined;
-    const doc = snapshot.docs[0];
-    return { id: doc.id, ...doc.data() } as PokeNotification;
+      const notifications = await db.getNotificationsForUser(toUserId);
+      return notifications.find(n => 
+          n.type === 'poke' && 
+          (n as PokeNotification).fromUserId === fromUserId
+      ) as PokeNotification | undefined;
   },
   addPoke: async (fromUserId: string, toUserId: string): Promise<Notification> => {
-    const newPokeData: Omit<PokeNotification, 'id'> = {
-      type: 'poke', fromUserId, toUserId, timestamp: new Date().toISOString(), seen: false,
-    };
-    const docRef = await addDoc(notificationsRef, newPokeData);
-    return { id: docRef.id, ...newPokeData };
+      const notifications = getData<Notification[]>('notifications', []);
+      const newPoke: PokeNotification = {
+          id: crypto.randomUUID(),
+          type: 'poke', fromUserId, toUserId, timestamp: new Date().toISOString(), seen: false,
+      };
+      notifications.push(newPoke);
+      saveData('notifications', notifications);
+      return newPoke;
   },
   sendTournamentInvite: async (fromUserId: string, toUserId: string, tournamentId: string, tournamentName: string): Promise<Notification | null> => {
-    const tournamentRef = doc(tournamentsRef, tournamentId);
-    const tournamentSnap = await getDoc(tournamentRef);
-    if (!tournamentSnap.exists()) return null;
-    const tournament = tournamentSnap.data() as Tournament;
+      const tournaments = await db.getTournaments();
+      const tournament = tournaments.find(t => t.id === tournamentId);
+      if (!tournament) return null;
 
-    if (tournament.memberIds.includes(toUserId) || tournament.pendingMemberIds.includes(toUserId)) {
-        return null;
-    }
-    
-    const newPendingMembers = [...tournament.pendingMemberIds, toUserId];
-    await setDoc(tournamentRef, { pendingMemberIds: newPendingMembers }, { merge: true });
-    
-    const newInviteData: Omit<TournamentInviteNotification, 'id'> = {
-        type: 'tournament_invite', fromUserId, toUserId, tournamentId, tournamentName,
-        timestamp: new Date().toISOString(), seen: false,
-    };
-    const docRef = await addDoc(notificationsRef, newInviteData);
-    return { id: docRef.id, ...newInviteData };
+      if (tournament.memberIds.includes(toUserId) || tournament.pendingMemberIds.includes(toUserId)) {
+          return null;
+      }
+      
+      tournament.pendingMemberIds.push(toUserId);
+      await db.saveTournament(tournament);
+
+      const notifications = getData<Notification[]>('notifications', []);
+      const newInvite: TournamentInviteNotification = {
+          id: crypto.randomUUID(),
+          type: 'tournament_invite', fromUserId, toUserId, tournamentId, tournamentName,
+          timestamp: new Date().toISOString(), seen: false,
+      };
+      notifications.push(newInvite);
+      saveData('notifications', notifications);
+      return newInvite;
   },
   acceptTournamentInvite: async (notificationId: string, userId: string, tournamentId: string): Promise<Tournament | null> => {
-    const tournamentRef = doc(tournamentsRef, tournamentId);
-    const tournamentSnap = await getDoc(tournamentRef);
-    if (!tournamentSnap.exists()) return null;
-    let tournament = { id: tournamentSnap.id, ...tournamentSnap.data() } as Tournament;
+      const tournaments = await db.getTournaments();
+      const tournament = tournaments.find(t => t.id === tournamentId);
+      if (!tournament) return null;
+      
+      tournament.pendingMemberIds = tournament.pendingMemberIds.filter(id => id !== userId);
+      if (!tournament.memberIds.includes(userId)) {
+          tournament.memberIds.push(userId);
+      }
+      await db.saveTournament(tournament);
 
-    const batch = writeBatch(firestoreDb);
-    
-    const pendingMemberIds = tournament.pendingMemberIds.filter(id => id !== userId);
-    const memberIds = tournament.memberIds.includes(userId) ? tournament.memberIds : [...tournament.memberIds, userId];
-    batch.update(tournamentRef, { pendingMemberIds, memberIds });
-    
-    const notificationRef = doc(notificationsRef, notificationId);
-    batch.update(notificationRef, { seen: true });
-    
-    const acceptanceNotificationRef = doc(notificationsRef);
-    const acceptanceNotification: Omit<TournamentInviteAcceptedNotification, 'id'> = {
-        type: 'tournament_invite_accepted', toUserId: tournament.creatorId, fromUserId: userId,
-        tournamentId: tournament.id, tournamentName: tournament.name, timestamp: new Date().toISOString(), seen: false,
-    };
-    batch.set(acceptanceNotificationRef, acceptanceNotification);
+      const notifications = getData<Notification[]>('notifications', []);
+      const inviteNotifIndex = notifications.findIndex(n => n.id === notificationId);
+      if (inviteNotifIndex > -1) {
+          notifications[inviteNotifIndex].seen = true;
+      }
 
-    await batch.commit();
-    return { ...tournament, memberIds, pendingMemberIds };
+      const acceptanceNotification: TournamentInviteAcceptedNotification = {
+          id: crypto.randomUUID(),
+          type: 'tournament_invite_accepted', toUserId: tournament.creatorId, fromUserId: userId,
+          tournamentId: tournament.id, tournamentName: tournament.name, timestamp: new Date().toISOString(), seen: false,
+      };
+      notifications.push(acceptanceNotification);
+      saveData('notifications', notifications);
+      
+      return tournament;
   },
   declineTournamentInvite: async (notificationId: string, userId: string, tournamentId: string): Promise<void> => {
-      const tournamentRef = doc(tournamentsRef, tournamentId);
-      const tournamentSnap = await getDoc(tournamentRef);
-      if (!tournamentSnap.exists()) return;
-      const tournament = tournamentSnap.data() as Tournament;
+      const tournaments = await db.getTournaments();
+      const tournament = tournaments.find(t => t.id === tournamentId);
+      if (!tournament) return;
 
-      const batch = writeBatch(firestoreDb);
+      tournament.pendingMemberIds = tournament.pendingMemberIds.filter(id => id !== userId);
+      await db.saveTournament(tournament);
       
-      const pendingMemberIds = tournament.pendingMemberIds.filter(id => id !== userId);
-      batch.update(tournamentRef, { pendingMemberIds });
-
-      const notificationRef = doc(notificationsRef, notificationId);
-      batch.update(notificationRef, { seen: true });
-
-      const declineNotificationRef = doc(notificationsRef);
-      const declineNotification: Omit<TournamentInviteDeclinedNotification, 'id'> = {
+      const notifications = getData<Notification[]>('notifications', []);
+      const inviteNotifIndex = notifications.findIndex(n => n.id === notificationId);
+      if (inviteNotifIndex > -1) {
+          notifications[inviteNotifIndex].seen = true;
+      }
+      
+      const declineNotification: TournamentInviteDeclinedNotification = {
+          id: crypto.randomUUID(),
           type: 'tournament_invite_declined', toUserId: tournament.creatorId, fromUserId: userId,
           tournamentId, tournamentName: tournament.name, timestamp: new Date().toISOString(), seen: false,
       };
-      batch.set(declineNotificationRef, declineNotification);
-      
-      await batch.commit();
+      notifications.push(declineNotification);
+      saveData('notifications', notifications);
   },
   getNotificationsForUser: async (toUserId: string): Promise<Notification[]> => {
-    const q = query(notificationsRef, where("toUserId", "==", toUserId), where("seen", "==", false), orderBy("timestamp", "desc"));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+      const allNotifications = getData<Notification[]>('notifications', []);
+      return allNotifications
+          .filter(n => n.toUserId === toUserId && !n.seen)
+          .sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   },
   markNotificationsAsSeen: async (notificationIds: string[]): Promise<void> => {
-    const batch = writeBatch(firestoreDb);
-    notificationIds.forEach(id => {
-        batch.update(doc(notificationsRef, id), { seen: true });
-    });
-    await batch.commit();
+      const notifications = getData<Notification[]>('notifications', []);
+      notifications.forEach(n => {
+          if (notificationIds.includes(n.id)) {
+              n.seen = true;
+          }
+      });
+      saveData('notifications', notifications);
   },
   
-  // Scoring Logic (now uses Firestore data)
+  // Scoring Logic
   calculateGpScores: (gpId: number, officialResult: OfficialResult, allPredictions: Prediction[]): Score[] => {
     if (!officialResult) return [];
     const gpPredictions = allPredictions.filter(p => p.gpId === gpId);
@@ -311,13 +382,12 @@ export const db = {
   },
 
   calculateSeasonTotals: async (): Promise<SeasonTotal[]> => {
-      const [allUsers, allOfficialResults, allPredictionsDocs, allAdjustments] = await Promise.all([
+      const [allUsers, allOfficialResults, allPredictions, allAdjustments] = await Promise.all([
           db.getUsers(),
           db.getOfficialResults(),
-          getDocs(predictionsRef),
+          getData<Prediction[]>('predictions', []),
           db.getPointAdjustments()
       ]);
-      const allPredictions = allPredictionsDocs.docs.map(d => d.data() as Prediction);
       const totals: Map<string, SeasonTotal> = new Map();
       allUsers.forEach(user => {
           totals.set(user.id, {
@@ -357,16 +427,7 @@ export const db = {
   },
   
   seedDatabase: async (): Promise<void> => {
-    const batch = writeBatch(firestoreDb);
-
-    TEAMS.forEach(team => batch.set(doc(teamsRef, team.id), team));
-    DRIVERS.forEach(driver => batch.set(doc(driversRef, driver.id), driver));
-    GP_SCHEDULE.forEach(gp => batch.set(doc(scheduleRef, String(gp.id)), gp));
-
-    // Clear existing data (optional, but good for a clean seed)
-    // Note: Deleting collections client-side is complex. This seed should be run on an empty DB.
-    
-    // For now, we just overwrite.
-    await batch.commit();
+    localStorage.removeItem('seeded');
+    seedDatabase();
   }
 };

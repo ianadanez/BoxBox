@@ -5,6 +5,7 @@ import { GrandPrix, OfficialResult, Driver, Team, SeasonTotal } from '../types';
 import { db } from '../services/db';
 import Countdown from '../components/common/Countdown';
 import Avatar from '../components/common/Avatar';
+import { useAuth } from '../contexts/AuthContext';
 
 const getTeamColor = (driverId: string, drivers: Driver[], teams: Team[]) => {
   const driver = drivers.find(d => d.id === driverId);
@@ -61,6 +62,7 @@ const PodiumCard: React.FC<{ position: number; driverId?: string; drivers: Drive
 
 
 const HomePage: React.FC = () => {
+    const { user } = useAuth();
     const [lastGp, setLastGp] = useState<GrandPrix | null>(null);
     const [nextGp, setNextGp] = useState<GrandPrix | null>(null);
     const [lastResult, setLastResult] = useState<OfficialResult | null>(null);
@@ -78,7 +80,7 @@ const HomePage: React.FC = () => {
                     db.getOfficialResults(),
                     db.getDrivers(),
                     db.getTeams(),
-                    db.calculateSeasonTotals()
+                    user ? db.calculateSeasonTotals() : Promise.resolve([] as SeasonTotal[]),
                 ]);
                 
                 setDrivers(driversData);
@@ -108,7 +110,7 @@ const HomePage: React.FC = () => {
         };
 
         fetchData();
-    }, []);
+    }, [user]);
 
 
     return (
@@ -182,7 +184,7 @@ const HomePage: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {loading && leaderboard.length === 0 && (
+                                {loading && leaderboard.length === 0 && user && (
                                     Array.from({length: 5}).map((_, i) => (
                                          <tr key={i} className="border-b border-[var(--border-color)]">
                                             <td className="p-3 text-center"><div className="h-6 w-4 bg-[var(--background-light)] rounded mx-auto"></div></td>
@@ -210,7 +212,10 @@ const HomePage: React.FC = () => {
                                         <td className="hidden md:table-cell p-3 text-center font-mono text-[var(--text-secondary)]">{score.details.exactPole}</td>
                                     </tr>
                                 ))}
-                                {!loading && leaderboard.length === 0 && (
+                                {!loading && !user && (
+                                     <tr><td colSpan={6} className="text-center p-8 text-[var(--text-secondary)]">Inicia sesión para ver la tabla de clasificación.</td></tr>
+                                )}
+                                {!loading && user && leaderboard.length === 0 && (
                                      <tr><td colSpan={6} className="text-center p-8 text-[var(--text-secondary)]">Aún no hay puntajes esta temporada.</td></tr>
                                 )}
                             </tbody>
