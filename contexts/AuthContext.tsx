@@ -52,14 +52,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
         const userProfile = await db.getUserByEmail(email);
         
-        // In this local-only version, we accept a hardcoded password for simplicity.
-        if (userProfile && userProfile.password === password) {
-            setUser(userProfile);
-            sessionStorage.setItem('userId', userProfile.id);
-        } else {
-            // Throw an error with a message that mimics Firebase for component compatibility
-            throw new Error('auth/invalid-credential');
+        if (!userProfile) {
+            throw new Error('auth/user-not-found');
         }
+
+        if (userProfile.password !== password) {
+            throw new Error('auth/wrong-password');
+        }
+
+        setUser(userProfile);
+        sessionStorage.setItem('userId', userProfile.id);
+
     } catch(error) {
         console.error("Login failed:", error);
         throw error;

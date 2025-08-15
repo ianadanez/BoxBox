@@ -20,8 +20,10 @@ const LoginPage: React.FC = () => {
         await login(email, password);
         navigate('/');
     } catch (err: any) {
-        if (err.message === 'auth/invalid-credential') {
-            setError('El email o la contraseña son incorrectos.');
+        if (err.message === 'auth/user-not-found') {
+            setError('No se encontró ningún usuario con ese email.');
+        } else if (err.message === 'auth/wrong-password') {
+            setError('La contraseña es incorrecta.');
         } else {
             setError('Ocurrió un error inesperado al iniciar sesión.');
         }
