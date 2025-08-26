@@ -433,6 +433,14 @@ export const db = {
       if (snapshot.empty) return undefined;
       return snapshot.docs[0].data() as PokeNotification;
   },
+  clearAllPokes: async (): Promise<void> => {
+      const q = notificationsCol.where("type", "==", "poke");
+      const snapshot = await q.get();
+      const batch = firestore.batch();
+      snapshot.docs.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+      console.log(`Deleted ${snapshot.docs.length} poke notifications`);
+  },
 
   // Admin
   getPointAdjustments: async (): Promise<PointAdjustment[]> => {

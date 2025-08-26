@@ -48,7 +48,7 @@ const Header: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const notificationContainerRef = useRef<HTMLDivElement>(null);
-  
+
   useEffect(() => {
     const fetchNextGp = async () => {
         const schedule = await db.getSchedule();
@@ -59,58 +59,42 @@ const Header: React.FC = () => {
     fetchNextGp();
   }, []);
 
-  // Single, robust effect to fetch and process notifications
-  useEffect(() => {
+  // Function to load notifications for the currently logged-in user
+  const loadNotifications = async () => {
     if (!user) {
         setNotifications([]);
         return;
     }
-
-    const fetchAndProcessNotifications = async () => {
-        const rawNotifications = await db.getNotificationsForUser(user.id);
-
-        const fromUserIds = [...new Set(
-            rawNotifications
-                .filter((n): n is PokeNotification | TournamentInviteNotification | TournamentInviteAcceptedNotification | TournamentInviteDeclinedNotification => 
-                    n.type === 'poke' || 
-                    n.type === 'tournament_invite' ||
-                    n.type === 'tournament_invite_accepted' ||
-                    n.type === 'tournament_invite_declined'
-                )
-                .map((n) => n.fromUserId)
-        )];
-
-        let processedNotifications: RenderableNotification[] = rawNotifications;
-
-        if (fromUserIds.length > 0) {
-            const users = await db.getUsers();
-            const usersById = new Map(users.map(u => [u.id, u]));
-            
-            processedNotifications = rawNotifications.map(n => {
-                if (
-                    n.type === 'poke' || 
-                    n.type === 'tournament_invite' ||
-                    n.type === 'tournament_invite_accepted' ||
-                    n.type === 'tournament_invite_declined'
-                ) {
-                    return { ...n, fromUser: usersById.get(n.fromUserId) };
+    try {
+        const userNotifications = await db.getNotificationsForUser(user.id);
+        const enrichedNotifications = await Promise.all(
+            userNotifications.map(async (notif) => {
+                if ('fromUserId' in notif && notif.fromUserId) {
+                    const fromUser = await db.getUserById(notif.fromUserId);
+                    return { ...notif, fromUser };
                 }
-                return n;
-            });
-        }
-        
-        setNotifications(current => 
-            JSON.stringify(current) !== JSON.stringify(processedNotifications) 
-            ? processedNotifications 
-            : current
+                return notif;
+            })
         );
-    };
+        setNotifications(enrichedNotifications);
+    } catch (error) {
+        console.error('Error loading notifications:', error);
+    }
+  };
 
-    fetchAndProcessNotifications();
-    const interval = setInterval(fetchAndProcessNotifications, 5000); // Poll every 5 seconds
-    return () => clearInterval(interval);
-  }, [user]);
+  // Effect to load notifications when the user logs in or the component mounts
+  useEffect(() => {
+    if (user) {
+      loadNotifications();
+    } else {
+      setNotifications([]);
+    }
+  }, [user, loadNotifications]);
 
+  // Debug log to check if notifications are loading
+  useEffect(() => {
+    console.log('Notifications updated:', notifications.length, notifications);
+  }, [notifications]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -129,24 +113,40 @@ const Header: React.FC = () => {
     navigate('/');
   };
 
-  const handleOpenNotifications = () => {
-    setIsNotificationsOpen(!isNotificationsOpen);
+  const toggleNotifications = async () => {
+    const newState = !isNotificationsOpen;
+    setIsNotificationsOpen(newState);
 
-    // Mark non-actionable notifications as seen when opening
-    if (!isNotificationsOpen && notifications.length > 0) {
-        setTimeout(async () => {
-            if (user) {
-                const notifIds = notifications
+    // Load notifications when opening the panel
+    if (newState && user) {
+        try {
+            const userNotifications = await db.getNotificationsForUser(user.id);
+            const enrichedNotifications = await Promise.all(
+                userNotifications.map(async (notif) => {
+                    if ('fromUserId' in notif && notif.fromUserId) {
+                        const fromUser = await db.getUserById(notif.fromUserId);
+                        return { ...notif, fromUser };
+                    }
+                    return notif;
+                })
+            );
+            setNotifications(enrichedNotifications);
+
+            // Mark non-actionable notifications as seen after loading
+            setTimeout(async () => {
+                const notifIds = enrichedNotifications
                     .filter(n => n.type !== 'tournament_invite')
                     .map(p => p.id);
                 if (notifIds.length > 0) {
                     await db.markNotificationsAsSeen(notifIds);
                 }
-            }
-        }, 4000);
+            }, 2000);
+        } catch (error) {
+            console.error('Error loading notifications:', error);
+        }
     }
   };
-  
+
   const handleAcceptInvite = async (notification: TournamentInviteNotification) => {
     if (!user) return;
     setIsProcessingNotif(notification.id);
@@ -177,7 +177,7 @@ const Header: React.FC = () => {
     } after:content-[''] after:absolute after:left-3 after:right-3 after:bottom-1 after:h-[2px] after:bg-[var(--accent-red)] after:scale-x-0 after:transition-transform ${
       isActive ? 'after:scale-x-100' : 'hover:after:scale-x-100'
     }`;
-    
+
   const mobileNavLinkClass = ({ isActive }: { isActive: boolean }) =>
      `block px-3 py-2 rounded-md text-base font-medium ${
         isActive
@@ -269,6 +269,8 @@ const Header: React.FC = () => {
     }
   }
 
+  const unseenCount = notifications.filter(n => n.type !== 'poke' && n.type !== 'tournament_invite_accepted' && n.type !== 'tournament_invite_declined').length;
+
   return (
     <header className="bg-[var(--background-medium)]/80 backdrop-blur-sm border-b border-[var(--border-color)] sticky top-0 z-50">
       <nav className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
@@ -304,11 +306,15 @@ const Header: React.FC = () => {
             {user ? (
               <div className="flex items-center space-x-2 md:space-x-4">
                 <div ref={notificationContainerRef} className="relative">
-                    <button onClick={handleOpenNotifications} className="relative text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors p-1">
+                    <button 
+                        onClick={toggleNotifications}
+                        className="relative p-2 hover:bg-[var(--background-light)] rounded-lg transition-colors"
+                        title={`Notificaciones (${notifications.length} total, ${unseenCount} sin ver)`}
+                    >
                         <BellIcon className="h-6 w-6" />
-                        {notifications.length > 0 && (
-                            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent-red)] text-xs font-bold text-white animate-pulse">
-                                {notifications.length}
+                        {unseenCount > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-[var(--accent-red)] text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                                {unseenCount > 9 ? '9+' : unseenCount}
                             </span>
                         )}
                     </button>
@@ -351,7 +357,7 @@ const Header: React.FC = () => {
                 Ingresar
               </NavLink>
             )}
-            
+
              <div className="md:hidden">
                 <button
                     onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
