@@ -1,7 +1,11 @@
 
 
+
 import { User, Team, Driver, GrandPrix, Prediction, OfficialResult, Result, Tournament, Score, SeasonTotal, PointAdjustment, Notification, PokeNotification, TournamentInviteNotification, ResultsNotification, PointsAdjustmentNotification, TournamentInviteAcceptedNotification, TournamentInviteDeclinedNotification } from '../types';
 import { TEAMS, DRIVERS, GP_SCHEDULE, SCORING_RULES } from '../constants';
+// FIX: Added firebase compat import for FieldValue operations.
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/firestore';
 // FIX: Updated firebase config now provides compat instances.
 import { firestoreDb as firestore } from '../firebaseConfig';
 
@@ -68,4 +72,374 @@ export const db = {
   getSchedule: async (): Promise<GrandPrix[]> => {
       // FIX: Use compat API `orderBy()` and `get()` methods.
       const q = scheduleCol.orderBy("id");
+      // FIX: Complete function by awaiting snapshot and returning data.
+      const snapshot = await q.get();
+      return snapshot.docs.map(doc => doc.data() as GrandPrix);
+  },
+  saveGp: async (gp: GrandPrix): Promise<void> => {
+      const docRef = scheduleCol.doc(String(gp.id));
+      await docRef.set(gp, { merge: true });
+  },
+  replaceSchedule: async (newSchedule: GrandPrix[]): Promise<void> => {
+      const batch = firestore.batch();
+      const existingDocs = await scheduleCol.get();
+      existingDocs.forEach(doc => batch.delete(doc.ref));
+      newSchedule.forEach(gp => {
+          const docRef = scheduleCol.doc(String(gp.id));
+          batch.set(docRef, gp);
+      });
+      await batch.commit();
+  },
+
+  // Predictions
+  getPrediction: async (userId: string, gpId: number): Promise<Prediction | undefined> => {
+      const docId = `${userId}_${gpId}`;
+      const docRef = predictionsCol.doc(docId);
+      const docSnap = await docRef.get();
+      return docSnap.exists ? docSnap.data() as Prediction : undefined;
+  },
+  getPredictionsForGp: async (gpId: number): Promise<Prediction[]> => {
+      const q = predictionsCol.where("gpId", "==", gpId);
+      const snapshot = await q.get();
+      return snapshot.docs.map(doc => doc.data() as Prediction);
+  },
+  savePrediction: async (prediction: Prediction): Promise<void> => {
+      const docId = `${prediction.userId}_${prediction.gpId}`;
+      const docRef = predictionsCol.doc(docId);
+      await docRef.set(prediction, { merge: true });
+  },
+
+  // Results
+  getDraftResult: async (gpId: number): Promise<Result | undefined> => {
+      const docRef = draftResultsCol.doc(String(gpId));
+      const docSnap = await docRef.get();
+      return docSnap.exists ? docSnap.data() as Result : undefined;
+  },
+  saveDraftResult: async (result: Result): Promise<void> => {
+      const docRef = draftResultsCol.doc(String(result.gpId));
+      await docRef.set(result, { merge: true });
+  },
+  getOfficialResults: async (): Promise<OfficialResult[]> => {
+      const snapshot = await resultsCol.orderBy("gpId").get();
+      return snapshot.docs.map(doc => doc.data() as OfficialResult);
+  },
+  getOfficialResult: async (gpId: number): Promise<OfficialResult | undefined> => {
+      const docRef = resultsCol.doc(String(gpId));
+      const docSnap = await docRef.get();
+      return docSnap.exists ? docSnap.data() as OfficialResult : undefined;
+  },
+  publishResult: async (result: OfficialResult): Promise<void> => {
+      const batch = firestore.batch();
       
+      const resultRef = resultsCol.doc(String(result.gpId));
+      batch.set(resultRef, result, { merge: true });
+
+      const draftRef = draftResultsCol.doc(String(result.gpId));
+      batch.delete(draftRef);
+
+      const predictionsSnap = await predictionsCol.where("gpId", "==", result.gpId).get();
+      const predictions = predictionsSnap.docs.map(p => p.data() as Prediction);
+      const gpSnap = await scheduleCol.doc(String(result.gpId)).get();
+      const gp = gpSnap.data() as GrandPrix;
+      
+      const userIds = [...new Set(predictions.map(p => p.userId))];
+
+      for (const userId of userIds) {
+          const notifRef = notificationsCol.doc();
+          const notification: ResultsNotification = {
+              id: notifRef.id,
+              toUserId: userId,
+              type: 'results',
+              gpId: result.gpId,
+              gpName: gp?.name || `GP ${result.gpId}`,
+              timestamp: new Date().toISOString(),
+              seen: false,
+          };
+          batch.set(notifRef, notification);
+      }
+      await batch.commit();
+  },
+
+  // Scoring
+  calculateSeasonTotals: async (): Promise<SeasonTotal[]> => {
+    const [usersSnap, predictionsSnap, resultsSnap, adjustmentsSnap] = await Promise.all([
+        usersCol.get(),
+        predictionsCol.get(),
+        resultsCol.get(),
+        pointAdjustmentsCol.orderBy("timestamp", "desc").get(),
+    ]);
+
+    const users = usersSnap.docs.map(d => d.data() as User);
+    const allPredictions = predictionsSnap.docs.map(d => d.data() as Prediction);
+    const officialResults = resultsSnap.docs.map(d => d.data() as OfficialResult);
+    const pointAdjustments = adjustmentsSnap.docs.map(d => d.data() as PointAdjustment);
+
+    const scores: { [userId: string]: SeasonTotal } = {};
+
+    users.forEach(user => {
+        scores[user.id] = {
+            userId: user.id,
+            userName: user.name,
+            userAvatar: user.avatar,
+            totalPoints: 0,
+            details: { exactPole: 0, exactP1: 0, exactFastestLap: 0 },
+            pointAdjustments: [],
+        };
+    });
+
+    officialResults.forEach(result => {
+        const gpPredictions = allPredictions.filter(p => p.gpId === result.gpId);
+        gpPredictions.forEach(pred => {
+            if (!scores[pred.userId]) return;
+
+            let gpPoints = 0;
+
+            if (result.pole && result.pole === pred.pole) {
+                gpPoints += SCORING_RULES.pole;
+                scores[pred.userId].details.exactPole++;
+            }
+            if (result.fastestLap && result.fastestLap === pred.fastestLap) {
+                gpPoints += SCORING_RULES.fastestLap;
+                scores[pred.userId].details.exactFastestLap++;
+            }
+            if (result.driverOfTheDay && result.driverOfTheDay === pred.driverOfTheDay) {
+                gpPoints += SCORING_RULES.driverOfTheDay;
+            }
+            if (result.racePodium && pred.racePodium) {
+                if (result.racePodium[0] === pred.racePodium[0]) {
+                    gpPoints += SCORING_RULES.racePodium.p1;
+                    scores[pred.userId].details.exactP1++;
+                }
+                if (result.racePodium[1] === pred.racePodium[1]) gpPoints += SCORING_RULES.racePodium.p2;
+                if (result.racePodium[2] === pred.racePodium[2]) gpPoints += SCORING_RULES.racePodium.p3;
+                
+                const correctPositions = [pred.racePodium[0] === result.racePodium[0], pred.racePodium[1] === result.racePodium[1], pred.racePodium[2] === result.racePodium[2]];
+                pred.racePodium.forEach((driverId, index) => {
+                    if (driverId && result.racePodium?.includes(driverId) && !correctPositions[index]) {
+                        gpPoints += SCORING_RULES.racePodium.inPodium;
+                    }
+                });
+            }
+            if (result.sprintPole && result.sprintPole === pred.sprintPole) {
+                gpPoints += SCORING_RULES.sprintPole;
+            }
+            if (result.sprintPodium && pred.sprintPodium) {
+                if (result.sprintPodium[0] === pred.sprintPodium[0]) gpPoints += SCORING_RULES.sprintPodium.p1;
+                if (result.sprintPodium[1] === pred.sprintPodium[1]) gpPoints += SCORING_RULES.sprintPodium.p2;
+                if (result.sprintPodium[2] === pred.sprintPodium[2]) gpPoints += SCORING_RULES.sprintPodium.p3;
+
+                const correctSprintPositions = [pred.sprintPodium[0] === result.sprintPodium[0], pred.sprintPodium[1] === result.sprintPodium[1], pred.sprintPodium[2] === result.sprintPodium[2]];
+                pred.sprintPodium.forEach((driverId, index) => {
+                    if (driverId && result.sprintPodium?.includes(driverId) && !correctSprintPositions[index]) {
+                        gpPoints += SCORING_RULES.sprintPodium.inPodium;
+                    }
+                });
+            }
+            scores[pred.userId].totalPoints += gpPoints;
+        });
+    });
+    
+    pointAdjustments.forEach(adj => {
+        if (scores[adj.userId]) {
+            scores[adj.userId].totalPoints += adj.points;
+            scores[adj.userId].pointAdjustments?.push(adj);
+        }
+    });
+
+    return Object.values(scores).sort((a, b) => b.totalPoints - a.totalPoints);
+  },
+
+  // Tournaments
+  getTournaments: async (): Promise<Tournament[]> => {
+      const snapshot = await tournamentsCol.get();
+      return snapshot.docs.map(doc => doc.data() as Tournament);
+  },
+  saveTournament: async (tournament: Tournament): Promise<void> => {
+      const docRef = tournamentsCol.doc(tournament.id);
+      await docRef.set(tournament, { merge: true });
+  },
+  addTournament: async (tournamentData: Omit<Tournament, 'id' | 'pendingMemberIds'>): Promise<Tournament> => {
+      const docRef = tournamentsCol.doc();
+      const newTournament: Tournament = {
+          ...tournamentData,
+          id: docRef.id,
+          pendingMemberIds: [],
+      };
+      await docRef.set(newTournament);
+      return newTournament;
+  },
+  findTournamentByCode: async (code: string): Promise<Tournament | undefined> => {
+      const q = tournamentsCol.where("inviteCode", "==", code).limit(1);
+      const snapshot = await q.get();
+      if (snapshot.empty) return undefined;
+      return snapshot.docs[0].data() as Tournament;
+  },
+
+  // Notifications & Invites
+  getNotificationsForUser: async (userId: string): Promise<Notification[]> => {
+      const q = notificationsCol.where("toUserId", "==", userId).orderBy("timestamp", "desc").limit(20);
+      const snapshot = await q.get();
+      return snapshot.docs.map(doc => doc.data() as Notification);
+  },
+  markNotificationsAsSeen: async (notificationIds: string[]): Promise<void> => {
+      if(notificationIds.length === 0) return;
+      const batch = firestore.batch();
+      notificationIds.forEach(id => {
+          const docRef = notificationsCol.doc(id);
+          batch.update(docRef, { seen: true });
+      });
+      await batch.commit();
+  },
+  sendTournamentInvite: async (fromUserId: string, toUserId: string, tournamentId: string, tournamentName: string): Promise<boolean> => {
+      const tournamentRef = tournamentsCol.doc(tournamentId);
+      const tournamentSnap = await tournamentRef.get();
+      if (!tournamentSnap.exists) return false;
+
+      const tournament = tournamentSnap.data() as Tournament;
+      if (tournament.memberIds.includes(toUserId) || tournament.pendingMemberIds?.includes(toUserId)) {
+          return false;
+      }
+
+      const batch = firestore.batch();
+      
+      batch.update(tournamentRef, {
+          pendingMemberIds: firebase.firestore.FieldValue.arrayUnion(toUserId)
+      });
+      
+      const notifRef = notificationsCol.doc();
+      const invite: TournamentInviteNotification = {
+          id: notifRef.id, toUserId, fromUserId, tournamentId, tournamentName,
+          type: 'tournament_invite', timestamp: new Date().toISOString(), seen: false,
+      };
+      batch.set(notifRef, invite);
+
+      await batch.commit();
+      return true;
+  },
+  acceptTournamentInvite: async (notificationId: string, userId: string, tournamentId: string): Promise<Tournament | null> => {
+      const tournamentRef = tournamentsCol.doc(tournamentId);
+      const tournamentSnap = await tournamentRef.get();
+      if (!tournamentSnap.exists) {
+          await notificationsCol.doc(notificationId).delete();
+          return null;
+      }
+      const tournament = tournamentSnap.data() as Tournament;
+
+      const batch = firestore.batch();
+      batch.update(tournamentRef, {
+          memberIds: firebase.firestore.FieldValue.arrayUnion(userId),
+          pendingMemberIds: firebase.firestore.FieldValue.arrayRemove(userId),
+      });
+      batch.delete(notificationsCol.doc(notificationId));
+
+      const creatorNotifRef = notificationsCol.doc();
+      const acceptedNotification: TournamentInviteAcceptedNotification = {
+          id: creatorNotifRef.id, toUserId: tournament.creatorId, fromUserId: userId,
+          tournamentId: tournament.id, tournamentName: tournament.name,
+          type: 'tournament_invite_accepted', timestamp: new Date().toISOString(), seen: false,
+      };
+      batch.set(creatorNotifRef, acceptedNotification);
+      
+      await batch.commit();
+      
+      return { ...tournament, memberIds: [...tournament.memberIds, userId] };
+  },
+  declineTournamentInvite: async (notificationId: string, userId: string, tournamentId: string): Promise<void> => {
+      const tournamentRef = tournamentsCol.doc(tournamentId);
+      const tournamentSnap = await tournamentRef.get();
+      if (!tournamentSnap.exists) {
+          await notificationsCol.doc(notificationId).delete();
+          return;
+      }
+      const tournament = tournamentSnap.data() as Tournament;
+      
+      const batch = firestore.batch();
+      batch.update(tournamentRef, {
+          pendingMemberIds: firebase.firestore.FieldValue.arrayRemove(userId),
+      });
+      batch.delete(notificationsCol.doc(notificationId));
+
+      const creatorNotifRef = notificationsCol.doc();
+      const declinedNotification: TournamentInviteDeclinedNotification = {
+          id: creatorNotifRef.id, toUserId: tournament.creatorId, fromUserId: userId,
+          tournamentId: tournament.id, tournamentName: tournament.name,
+          type: 'tournament_invite_declined', timestamp: new Date().toISOString(), seen: false,
+      };
+      batch.set(creatorNotifRef, declinedNotification);
+      
+      await batch.commit();
+  },
+
+  // Pokes
+  addPoke: async (fromUserId: string, toUserId: string): Promise<void> => {
+      const docRef = notificationsCol.doc();
+      const poke: PokeNotification = {
+          id: docRef.id, fromUserId, toUserId, type: 'poke',
+          timestamp: new Date().toISOString(), seen: false,
+      };
+      await docRef.set(poke);
+  },
+  getExistingUnseenPoke: async (fromUserId: string, toUserId: string): Promise<PokeNotification | undefined> => {
+      const q = notificationsCol
+          .where("fromUserId", "==", fromUserId)
+          .where("toUserId", "==", toUserId)
+          .where("type", "==", "poke")
+          .where("seen", "==", false)
+          .limit(1);
+      const snapshot = await q.get();
+      if (snapshot.empty) return undefined;
+      return snapshot.docs[0].data() as PokeNotification;
+  },
+
+  // Admin
+  getPointAdjustments: async (): Promise<PointAdjustment[]> => {
+      const q = pointAdjustmentsCol.orderBy("timestamp", "desc");
+      const snapshot = await q.get();
+      return snapshot.docs.map(doc => doc.data() as PointAdjustment);
+  },
+  addPointAdjustment: async (adjustment: Omit<PointAdjustment, 'id' | 'timestamp'>): Promise<void> => {
+      const batch = firestore.batch();
+      
+      const adjRef = pointAdjustmentsCol.doc();
+      const newAdjustment: PointAdjustment = {
+          ...adjustment,
+          id: adjRef.id,
+          timestamp: new Date().toISOString(),
+      };
+      batch.set(adjRef, newAdjustment);
+
+      const notifRef = notificationsCol.doc();
+      const notification: PointsAdjustmentNotification = {
+          id: notifRef.id, toUserId: adjustment.userId, type: 'points_adjustment',
+          points: adjustment.points, reason: adjustment.reason, adminId: adjustment.adminId,
+          timestamp: new Date().toISOString(), seen: false,
+      };
+      batch.set(notifRef, notification);
+      
+      await batch.commit();
+  },
+  seedFirebase: async (): Promise<void> => {
+      console.log("Starting Firebase seed...");
+      
+      const collectionsToClear = [teamsCol, driversCol, scheduleCol, predictionsCol, resultsCol, draftResultsCol, tournamentsCol, pointAdjustmentsCol, notificationsCol];
+      
+      for (const col of collectionsToClear) {
+          const snapshot = await col.get();
+          if (snapshot.empty) continue;
+          const batch = firestore.batch();
+          snapshot.docs.forEach(doc => batch.delete(doc.ref));
+          await batch.commit();
+          console.log(`Cleared collection: ${col.id}`);
+      }
+      
+      const seedBatch = firestore.batch();
+      TEAMS.forEach(team => seedBatch.set(teamsCol.doc(team.id), team));
+      DRIVERS.forEach(driver => seedBatch.set(driversCol.doc(driver.id), driver));
+      GP_SCHEDULE.forEach(gp => seedBatch.set(scheduleCol.doc(String(gp.id)), gp));
+      
+      await seedBatch.commit();
+      console.log("Seeded Teams, Drivers, and Schedule.");
+      console.log("NOTE: Test users (e.g., admin@boxbox.com) must be created manually in the Firebase Authentication console.");
+      console.log("Firebase seed complete.");
+  },
+};
