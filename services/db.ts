@@ -308,8 +308,14 @@ export const db = {
       
       const notifRef = notificationsCol.doc();
       const invite: TournamentInviteNotification = {
-          id: notifRef.id, toUserId, fromUserId, tournamentId, tournamentName,
-          type: 'tournament_invite', timestamp: new Date().toISOString(), seen: false,
+          id: notifRef.id,
+          toUserId: toUserId,
+          fromUserId: fromUserId,
+          tournamentId: tournamentId,
+          tournamentName: tournamentName,
+          type: 'tournament_invite',
+          timestamp: new Date().toISOString(),
+          seen: false,
       };
       batch.set(notifRef, invite);
 

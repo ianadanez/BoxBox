@@ -131,15 +131,20 @@ const TournamentsPage: React.FC = () => {
     const handleSendInvite = async (invitedUser: User) => {
         if (!user || !selectedTournament) return;
         
-        const result = await db.sendTournamentInvite(user.id, invitedUser.id, selectedTournament.id, selectedTournament.name);
-        
-        if (result) {
-            alert(`Se ha enviado una invitación a ${invitedUser.name}.`);
-            // Optimistically update UI
-            setTournamentPendingMembers(prev => [...prev, invitedUser]);
-            setSelectedTournament(prev => prev ? ({ ...prev, pendingMemberIds: [...(prev.pendingMemberIds || []), invitedUser.id] }) : null);
-        } else {
-            alert(`${invitedUser.name} ya es miembro o tiene una invitación pendiente.`);
+        try {
+            const result = await db.sendTournamentInvite(user.id, invitedUser.id, selectedTournament.id, selectedTournament.name);
+            
+            if (result) {
+                alert(`Se ha enviado una invitación a ${invitedUser.name}.`);
+                // Optimistically update UI
+                setTournamentPendingMembers(prev => [...prev, invitedUser]);
+                setSelectedTournament(prev => prev ? ({ ...prev, pendingMemberIds: [...(prev.pendingMemberIds || []), invitedUser.id] }) : null);
+            } else {
+                alert(`${invitedUser.name} ya es miembro o tiene una invitación pendiente.`);
+            }
+        } catch (error) {
+            console.error('Error sending tournament invite:', error);
+            alert('Error al enviar la invitación. Por favor, intenta de nuevo.');
         }
         
         // Remove user from suggestions and clear search
