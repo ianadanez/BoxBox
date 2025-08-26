@@ -164,7 +164,20 @@ const TournamentsPage: React.FC = () => {
     const handleLeaveTournament = async () => {
         if (!user || !selectedTournament) return;
         
-        const confirmLeave = confirm(`¿Estás seguro de que quieres salir del torneo "${selectedTournament.name}"?`);
+        const isCreator = user.id === selectedTournament.creatorId;
+        const otherMembers = selectedTournament.memberIds.filter(id => id !== user.id);
+        
+        let confirmMessage = `¿Estás seguro de que quieres salir del torneo "${selectedTournament.name}"?`;
+        
+        if (isCreator) {
+            if (otherMembers.length === 0) {
+                confirmMessage = `Eres el único miembro del torneo "${selectedTournament.name}". Al salir, el torneo será eliminado permanentemente. ¿Continuar?`;
+            } else {
+                confirmMessage = `Al abandonar el torneo "${selectedTournament.name}", la administración se transferirá automáticamente a otro miembro. ¿Continuar?`;
+            }
+        }
+        
+        const confirmLeave = confirm(confirmMessage);
         if (!confirmLeave) return;
         
         try {
@@ -196,14 +209,12 @@ const TournamentsPage: React.FC = () => {
             <div className="container mx-auto p-4 md:p-8 max-w-7xl">
                 <div className="flex justify-between items-center mb-6">
                     <button onClick={() => setSelectedTournament(null)} className="text-[var(--accent-red)] hover:opacity-80 transition-opacity">&larr; Volver a mis torneos</button>
-                    {!isCreator && (
-                        <button 
-                            onClick={handleLeaveTournament}
-                            className="bg-transparent border border-red-500 text-red-500 hover:bg-red-500 hover:text-white font-bold py-2 px-4 rounded-md transition-colors"
-                        >
-                            Salir del torneo
-                        </button>
-                    )}
+                    <button 
+                        onClick={handleLeaveTournament}
+                        className="bg-transparent border border-red-500 text-red-500 hover:bg-red-500 hover:text-white font-bold py-2 px-4 rounded-md transition-colors"
+                    >
+                        {isCreator ? 'Abandonar torneo' : 'Salir del torneo'}
+                    </button>
                 </div>
                 <h1 className="text-3xl md:text-4xl font-bold mb-2">{selectedTournament.name}</h1>
                 <p className="text-[var(--text-secondary)] mb-6">Código de invitación: <span className="font-mono bg-[var(--background-light)] text-[var(--text-primary)] py-1 px-2 rounded-md">{selectedTournament.inviteCode}</span></p>

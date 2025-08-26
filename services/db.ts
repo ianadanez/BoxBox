@@ -282,15 +282,30 @@ export const db = {
 
           const tournament = tournamentSnap.data() as Tournament;
           
-          // Don't allow creator to leave their own tournament
-          if (tournament.creatorId === userId) return false;
-          
-          // Remove user from tournament
-          await tournamentRef.update({
-              memberIds: firebase.firestore.FieldValue.arrayRemove(userId)
-          });
-          
-          return true;
+          // If creator is leaving and there are other members, transfer ownership
+          if (tournament.creatorId === userId) {
+              const otherMembers = tournament.memberIds.filter(id => id !== userId);
+              
+              if (otherMembers.length === 0) {
+                  // Delete tournament if no other members
+                  await tournamentRef.delete();
+                  return true;
+              } else {
+                  // Transfer ownership to the first remaining member
+                  const newCreatorId = otherMembers[0];
+                  await tournamentRef.update({
+                      creatorId: newCreatorId,
+                      memberIds: firebase.firestore.FieldValue.arrayRemove(userId)
+                  });
+                  return true;
+              }
+          } else {
+              // Regular member leaving
+              await tournamentRef.update({
+                  memberIds: firebase.firestore.FieldValue.arrayRemove(userId)
+              });
+              return true;
+          }
       } catch (error) {
           console.error('Error leaving tournament:', error);
           return false;

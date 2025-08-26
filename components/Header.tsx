@@ -130,20 +130,21 @@ const Header: React.FC = () => {
   };
 
   const handleOpenNotifications = () => {
-    if (notifications.length === 0) return;
-    setIsNotificationsOpen(true);
+    setIsNotificationsOpen(!isNotificationsOpen);
 
-    // Mark non-actionable notifications as seen
-    setTimeout(async () => {
-        if (user) {
-            const notifIds = notifications
-                .filter(n => n.type !== 'tournament_invite')
-                .map(p => p.id);
-            if (notifIds.length > 0) {
-                await db.markNotificationsAsSeen(notifIds);
+    // Mark non-actionable notifications as seen when opening
+    if (!isNotificationsOpen && notifications.length > 0) {
+        setTimeout(async () => {
+            if (user) {
+                const notifIds = notifications
+                    .filter(n => n.type !== 'tournament_invite')
+                    .map(p => p.id);
+                if (notifIds.length > 0) {
+                    await db.markNotificationsAsSeen(notifIds);
+                }
             }
-        }
-    }, 4000);
+        }, 4000);
+    }
   };
   
   const handleAcceptInvite = async (notification: TournamentInviteNotification) => {
@@ -311,16 +312,22 @@ const Header: React.FC = () => {
                             </span>
                         )}
                     </button>
-                    {isNotificationsOpen && notifications.length > 0 && (
+                    {isNotificationsOpen && (
                         <div className="absolute top-full right-0 mt-3 w-80 bg-[var(--background-medium)] border border-[var(--border-color)] rounded-lg shadow-2xl shadow-black/50 overflow-hidden z-20">
                            <div className="p-3 bg-[var(--background-light)] text-sm font-bold text-[var(--text-primary)]">Notificaciones</div>
-                            <ul className="max-h-96 overflow-y-auto">
-                                {notifications.map(notification => (
-                                    <li key={notification.id} className="p-3 border-t border-[var(--border-color)]">
-                                        {renderNotification(notification)}
-                                    </li>
-                                ))}
-                            </ul>
+                            {notifications.length > 0 ? (
+                                <ul className="max-h-96 overflow-y-auto">
+                                    {notifications.map(notification => (
+                                        <li key={notification.id} className="p-3 border-t border-[var(--border-color)]">
+                                            {renderNotification(notification)}
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <div className="p-4 text-center text-[var(--text-secondary)]">
+                                    No tienes notificaciones
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
