@@ -1,17 +1,10 @@
 
 import { GrandPrix, Result, Driver } from "../types";
 import { functions } from '../firebaseConfig';
-import { httpsCallable } from 'firebase/functions';
 
-const fetchDraftResultsCallable = httpsCallable<
-    { gp: GrandPrix, drivers: Driver[] },
-    Result
->(functions, 'fetchDraftResults');
+const fetchDraftResultsCallable = functions.httpsCallable('fetchDraftResults');
 
-const fetchScheduleCallable = httpsCallable<
-    { year: number },
-    GrandPrix[]
->(functions, 'fetchSchedule');
+const fetchScheduleCallable = functions.httpsCallable('fetchSchedule');
 
 
 const fetchDraftResults = async (gp: GrandPrix, drivers: Driver[]): Promise<Result | null> => {
@@ -27,10 +20,10 @@ const fetchDraftResults = async (gp: GrandPrix, drivers: Driver[]): Promise<Resu
 };
 
 const fetchSchedule = async (year: number): Promise<GrandPrix[] | null> => {
-     try {
+    try {
         const result = await fetchScheduleCallable({ year });
         return result.data;
-    } catch (error: any)        {
+    } catch (error: any) {
         console.error("Error calling fetchSchedule cloud function:", error);
         const errorMessage = error.message || "Un error desconocido ocurrió al contactar el servicio de IA.";
         alert(`No se pudo cargar el calendario automáticamente: ${errorMessage}`);
