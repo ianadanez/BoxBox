@@ -274,6 +274,28 @@ export const db = {
       if (snapshot.empty) return undefined;
       return snapshot.docs[0].data() as Tournament;
   },
+  leaveTournament: async (userId: string, tournamentId: string): Promise<boolean> => {
+      try {
+          const tournamentRef = tournamentsCol.doc(tournamentId);
+          const tournamentSnap = await tournamentRef.get();
+          if (!tournamentSnap.exists) return false;
+
+          const tournament = tournamentSnap.data() as Tournament;
+          
+          // Don't allow creator to leave their own tournament
+          if (tournament.creatorId === userId) return false;
+          
+          // Remove user from tournament
+          await tournamentRef.update({
+              memberIds: firebase.firestore.FieldValue.arrayRemove(userId)
+          });
+          
+          return true;
+      } catch (error) {
+          console.error('Error leaving tournament:', error);
+          return false;
+      }
+  },
 
   // Notifications & Invites
   getNotificationsForUser: async (userId: string): Promise<Notification[]> => {
