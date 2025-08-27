@@ -96,11 +96,12 @@ const PredictionsPage: React.FC = () => {
 
   useEffect(() => {
     if (!gp) return;
-    
-    const now = new Date();
-    const getLockTime = (eventTime: string) => new Date(new Date(eventTime).getTime() - LOCK_MINUTES_BEFORE * 60 * 1000);
+
+    const getLockTime = (eventTime: string) =>
+        new Date(new Date(eventTime).getTime() - LOCK_MINUTES_BEFORE * 60 * 1000);
 
     const checkLocks = () => {
+        const now = new Date();
         setLocks({
             quali: now > getLockTime(gp.events.quali),
             sprint: gp.hasSprint && gp.events.sprint ? now > getLockTime(gp.events.sprint) : true,
