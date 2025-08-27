@@ -124,23 +124,14 @@ const Header: React.FC = () => {
     navigate('/');
   };
 
-  const handleOpenNotifications = async () => {
-    // This function now toggles the panel visibility
-    if (isNotificationsOpen) {
-      setIsNotificationsOpen(false);
-      return;
-    }
+  const handleOpenNotifications = () => {
+    setIsNotificationsOpen(prev => !prev);
+  };
 
-    // Open the panel and mark relevant notifications as seen
-    setIsNotificationsOpen(true);
-    if (notifications.length === 0) return;
-
-    const notifIdsToMark = notifications
-      .filter(n => !n.seen && n.type !== 'tournament_invite')
-      .map(p => p.id);
-
-    if (notifIdsToMark.length > 0) {
-      await db.markNotificationsAsSeen(notifIdsToMark);
+  const handleMarkAllAsSeen = async () => {
+    const unseenIds = notifications.filter(n => !n.seen).map(n => n.id);
+    if (unseenIds.length > 0) {
+      await db.markNotificationsAsSeen(unseenIds);
     }
   };
   
@@ -311,7 +302,18 @@ const Header: React.FC = () => {
                     </button>
                     {isNotificationsOpen && (
                         <div className="absolute top-full right-0 mt-3 w-80 bg-[var(--background-medium)] border border-[var(--border-color)] rounded-lg shadow-2xl shadow-black/50 overflow-hidden z-20">
-                           <div className="p-3 bg-[var(--background-light)] text-sm font-bold text-[var(--text-primary)]">Notificaciones</div>
+                           <div className="p-3 bg-[var(--background-light)] text-sm font-bold text-[var(--text-primary)] flex justify-between items-center">
+                                <span>Notificaciones</span>
+                                {notifications.length > 0 && (
+                                    <button
+                                        onClick={handleMarkAllAsSeen}
+                                        disabled={unseenCount === 0}
+                                        className="text-xs font-semibold text-[var(--accent-blue)] hover:text-opacity-80 disabled:text-[var(--text-secondary)] disabled:hover:text-opacity-100 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        Marcar todas como leídas
+                                    </button>
+                                )}
+                           </div>
                             {notifications.length > 0 ? (
                                 <ul className="max-h-96 overflow-y-auto">
                                     {notifications.map(notification => (
