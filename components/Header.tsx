@@ -42,7 +42,6 @@ const Header: React.FC = () => {
   const navigate = useNavigate();
 
   const [notifications, setNotifications] = useState<RenderableNotification[]>([]);
-  const [newNotificationIds, setNewNotificationIds] = useState<Set<string>>(new Set());
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProcessingNotif, setIsProcessingNotif] = useState<string | null>(null);
   const [nextGp, setNextGp] = useState<GrandPrix | null>(null);
@@ -103,30 +102,11 @@ const Header: React.FC = () => {
             });
         }
         
-        const currentIds = new Set(notifications.map(n => n.id));
-        const newUnseenNotifications = processedNotifications.filter(
-            n => !currentIds.has(n.id) && !n.seen
-        );
-
-        if (newUnseenNotifications.length > 0) {
-            const newIds = new Set(newUnseenNotifications.map(n => n.id));
-            setNewNotificationIds(newIds);
-
-            // Clear the 'new' status after animation has finished
-            setTimeout(() => {
-                setNewNotificationIds(prev => {
-                    const updated = new Set(prev);
-                    newIds.forEach(id => updated.delete(id));
-                    return updated;
-                });
-            }, 4000); // 4 seconds
-        }
-
         setNotifications(processedNotifications);
     });
 
     return () => unsubscribe();
-  }, [user, notifications]);
+  }, [user]);
 
 
   useEffect(() => {
@@ -353,7 +333,7 @@ const Header: React.FC = () => {
                             {notifications.length > 0 ? (
                                 <ul className="max-h-96 overflow-y-auto">
                                     {notifications.map(notification => (
-                                        <li key={notification.id} className={`p-3 border-t border-[var(--border-color)] transition-colors ${newNotificationIds.has(notification.id) ? 'animate-new-notification' : ''} ${notification.seen ? 'opacity-60' : ''} ${notification.type === 'results' ? 'hover:bg-[var(--background-light)]' : ''}`}>
+                                        <li key={notification.id} className={`p-3 border-t border-[var(--border-color)] transition-colors ${notification.seen ? 'opacity-60' : ''} ${notification.type === 'results' ? 'hover:bg-[var(--background-light)]' : ''}`}>
                                             {renderNotification(notification)}
                                         </li>
                                     ))}
