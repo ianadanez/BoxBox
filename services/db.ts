@@ -1,7 +1,4 @@
 
-
-
-
 import { User, Team, Driver, GrandPrix, Prediction, OfficialResult, Result, Tournament, Score, SeasonTotal, PointAdjustment, Notification, PokeNotification, TournamentInviteNotification, ResultsNotification, PointsAdjustmentNotification, TournamentInviteAcceptedNotification, TournamentInviteDeclinedNotification } from '../types';
 import { TEAMS, DRIVERS, GP_SCHEDULE, SCORING_RULES } from '../constants';
 // FIX: Added firebase compat import for FieldValue operations.
@@ -90,6 +87,10 @@ export const db = {
   saveGp: async (gp: GrandPrix): Promise<void> => {
       const docRef = scheduleCol.doc(String(gp.id));
       await docRef.set(gp, { merge: true });
+  },
+  deleteGp: async (gpId: number): Promise<void> => {
+      const docRef = scheduleCol.doc(String(gpId));
+      await docRef.delete();
   },
   replaceSchedule: async (newSchedule: GrandPrix[]): Promise<void> => {
       const batch = firestore.batch();

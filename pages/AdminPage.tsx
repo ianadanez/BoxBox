@@ -335,6 +335,20 @@ const CalendarManagement: React.FC = () => {
         await loadData();
         handleCancel();
     };
+    
+    const handleDeleteGp = async (gp: GrandPrix) => {
+        if (window.confirm(`¿Estás seguro de que quieres eliminar el GP "${gp.name}"? Esta acción no se puede deshacer.`)) {
+            setLoading(true);
+            try {
+                await db.deleteGp(gp.id);
+                await loadData();
+            } catch (error) {
+                console.error("Error deleting GP:", error);
+                alert("Hubo un error al eliminar el Gran Premio.");
+            }
+            setLoading(false);
+        }
+    };
 
     const handleResetAndSeed = async () => {
         if (window.confirm("¿Estás seguro? Esto reemplazará los equipos, pilotos, calendario y usuarios de prueba en Firebase con los datos iniciales. Esta acción no se puede deshacer.")) {
@@ -420,8 +434,9 @@ const CalendarManagement: React.FC = () => {
                                 <td className="p-3 font-medium">{gp.name}</td>
                                 <td className="p-3 text-[var(--text-secondary)]">{new Date(gp.events.race).toLocaleString()}</td>
                                 <td className="p-3 text-center">{gp.hasSprint ? '✓' : '✗'}</td>
-                                <td className="p-3 text-right">
-                                    <button onClick={() => handleEdit(gp)} className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded-md transition-colors">Editar</button>
+                                <td className="p-3 text-right space-x-2">
+                                    <button onClick={() => handleEdit(gp)} className="bg-yellow-600 hover:bg-yellow-700 text-black font-bold py-1 px-3 rounded-md transition-colors">Editar</button>
+                                    <button onClick={() => handleDeleteGp(gp)} className="bg-red-800 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md transition-colors">Eliminar</button>
                                 </td>
                             </tr>
                         ))}
@@ -562,7 +577,7 @@ const DriversManagement: React.FC = () => {
                                     </span>
                                 </td>
                                 <td className="p-3 text-right">
-                                    <button onClick={() => handleEdit(driver)} className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded-md transition-colors">Editar</button>
+                                    <button onClick={() => handleEdit(driver)} className="bg-yellow-600 hover:bg-yellow-700 text-black font-bold py-1 px-3 rounded-md transition-colors">Editar</button>
                                 </td>
                             </tr>
                         ))}

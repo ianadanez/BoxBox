@@ -52,7 +52,7 @@ const PredictionsPage: React.FC = () => {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [prediction, setPrediction] = useState<Partial<Prediction>>({});
-  const [locks, setLocks] = useState({ quali: false, sprint: false, race: false });
+  const [isLocked, setIsLocked] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [loading, setLoading] = useState(true);
 
@@ -97,19 +97,16 @@ const PredictionsPage: React.FC = () => {
   useEffect(() => {
     if (!gp) return;
     
+    // The entire form locks based on the qualifying time.
     const getLockTime = (eventTime: string) => new Date(new Date(eventTime).getTime() - LOCK_MINUTES_BEFORE * 60 * 1000);
 
-    const checkLocks = () => {
+    const checkLock = () => {
         const now = new Date();
-        setLocks({
-            quali: now > getLockTime(gp.events.quali),
-            sprint: gp.hasSprint && gp.events.sprint ? now > getLockTime(gp.events.sprint) : true,
-            race: now > getLockTime(gp.events.race)
-        });
+        setIsLocked(now > getLockTime(gp.events.quali));
     };
 
-    checkLocks();
-    const interval = setInterval(checkLocks, 1000 * 30); // Check every 30 seconds
+    checkLock();
+    const interval = setInterval(checkLock, 1000 * 30); // Check every 30 seconds
     return () => clearInterval(interval);
   }, [gp]);
 
@@ -175,75 +172,79 @@ const PredictionsPage: React.FC = () => {
         </div>
       </div>
       
+       {isLocked && (
+            <div className="bg-yellow-900/50 border border-yellow-600 text-yellow-300 text-center p-4 rounded-lg mb-6">
+                <p className="font-bold">Las predicciones para este Gran Premio están cerradas.</p>
+                <p className="text-sm">El formulario se ha bloqueado 5 minutos antes del inicio de la clasificación.</p>
+            </div>
+        )}
+
       <form className="space-y-8" onSubmit={(e) => e.preventDefault()}>
         {/* Classification */}
-        <section className={`bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)] transition-opacity ${locks.quali ? 'opacity-60' : ''}`}>
+        <section className={`bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)] transition-opacity ${isLocked ? 'opacity-60' : ''}`}>
           <h2 className="text-2xl font-semibold f1-red-text mb-4">Clasificación</h2>
-          {locks.quali && <p className="text-yellow-400 text-sm mb-4">Esta sección está cerrada.</p>}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label htmlFor="pole" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Pole Position</label>
-              <DriverSelect id="pole" value={prediction.pole || ''} onChange={handleChange} drivers={drivers} teams={teams} disabled={locks.quali} />
+              <DriverSelect id="pole" value={prediction.pole || ''} onChange={handleChange} drivers={drivers} teams={teams} disabled={isLocked} />
             </div>
           </div>
         </section>
 
         {/* Sprint */}
         {gp.hasSprint && (
-            <section className={`bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)] transition-opacity ${locks.sprint ? 'opacity-60' : ''}`}>
+            <section className={`bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)] transition-opacity ${isLocked ? 'opacity-60' : ''}`}>
                 <h2 className="text-2xl font-semibold f1-red-text mb-4">Sprint</h2>
-                 {locks.sprint && <p className="text-yellow-400 text-sm mb-4">Esta sección está cerrada.</p>}
                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                     <div>
                         <label htmlFor="sprintPole" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Sprint Pole</label>
-                        <DriverSelect id="sprintPole" value={prediction.sprintPole || ''} onChange={handleChange} drivers={drivers} teams={teams} disabled={locks.sprint} />
+                        <DriverSelect id="sprintPole" value={prediction.sprintPole || ''} onChange={handleChange} drivers={drivers} teams={teams} disabled={isLocked} />
                     </div>
                     <div>
                         <label htmlFor="sprintP1" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Sprint P1</label>
-                         <DriverSelect id="sprintP1" value={prediction.sprintPodium?.[0] || ''} onChange={(e) => handlePodiumChange('sprintPodium', 0, e.target.value)} drivers={drivers} teams={teams} disabled={locks.sprint} usedDrivers={getPodiumUsedDrivers('sprintPodium')} />
+                         <DriverSelect id="sprintP1" value={prediction.sprintPodium?.[0] || ''} onChange={(e) => handlePodiumChange('sprintPodium', 0, e.target.value)} drivers={drivers} teams={teams} disabled={isLocked} usedDrivers={getPodiumUsedDrivers('sprintPodium')} />
                     </div>
                      <div>
                         <label htmlFor="sprintP2" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Sprint P2</label>
-                         <DriverSelect id="sprintP2" value={prediction.sprintPodium?.[1] || ''} onChange={(e) => handlePodiumChange('sprintPodium', 1, e.target.value)} drivers={drivers} teams={teams} disabled={locks.sprint} usedDrivers={getPodiumUsedDrivers('sprintPodium')} />
+                         <DriverSelect id="sprintP2" value={prediction.sprintPodium?.[1] || ''} onChange={(e) => handlePodiumChange('sprintPodium', 1, e.target.value)} drivers={drivers} teams={teams} disabled={isLocked} usedDrivers={getPodiumUsedDrivers('sprintPodium')} />
                     </div>
                      <div>
                         <label htmlFor="sprintP3" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Sprint P3</label>
-                         <DriverSelect id="sprintP3" value={prediction.sprintPodium?.[2] || ''} onChange={(e) => handlePodiumChange('sprintPodium', 2, e.target.value)} drivers={drivers} teams={teams} disabled={locks.sprint} usedDrivers={getPodiumUsedDrivers('sprintPodium')} />
+                         <DriverSelect id="sprintP3" value={prediction.sprintPodium?.[2] || ''} onChange={(e) => handlePodiumChange('sprintPodium', 2, e.target.value)} drivers={drivers} teams={teams} disabled={isLocked} usedDrivers={getPodiumUsedDrivers('sprintPodium')} />
                     </div>
                  </div>
             </section>
         )}
 
         {/* Race */}
-        <section className={`bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)] transition-opacity ${locks.race ? 'opacity-60' : ''}`}>
+        <section className={`bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)] transition-opacity ${isLocked ? 'opacity-60' : ''}`}>
            <h2 className="text-2xl font-semibold f1-red-text mb-4">Carrera</h2>
-           {locks.race && <p className="text-yellow-400 text-sm mb-4">Esta sección está cerrada.</p>}
            <div className="space-y-6">
                 <div>
                      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Podio</label>
                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                          <div>
                             <label htmlFor="raceP1" className="block text-xs font-medium text-gray-400 mb-1">P1 (Primer Puesto)</label>
-                            <DriverSelect id="raceP1" value={prediction.racePodium?.[0] || ''} onChange={(e) => handlePodiumChange('racePodium', 0, e.target.value)} drivers={drivers} teams={teams} disabled={locks.race} usedDrivers={getPodiumUsedDrivers('racePodium')} />
+                            <DriverSelect id="raceP1" value={prediction.racePodium?.[0] || ''} onChange={(e) => handlePodiumChange('racePodium', 0, e.target.value)} drivers={drivers} teams={teams} disabled={isLocked} usedDrivers={getPodiumUsedDrivers('racePodium')} />
                          </div>
                          <div>
                             <label htmlFor="raceP2" className="block text-xs font-medium text-gray-400 mb-1">P2 (Segundo Puesto)</label>
-                            <DriverSelect id="raceP2" value={prediction.racePodium?.[1] || ''} onChange={(e) => handlePodiumChange('racePodium', 1, e.target.value)} drivers={drivers} teams={teams} disabled={locks.race} usedDrivers={getPodiumUsedDrivers('racePodium')} />
+                            <DriverSelect id="raceP2" value={prediction.racePodium?.[1] || ''} onChange={(e) => handlePodiumChange('racePodium', 1, e.target.value)} drivers={drivers} teams={teams} disabled={isLocked} usedDrivers={getPodiumUsedDrivers('racePodium')} />
                          </div>
                          <div>
                             <label htmlFor="raceP3" className="block text-xs font-medium text-gray-400 mb-1">P3 (Tercer Puesto)</label>
-                            <DriverSelect id="raceP3" value={prediction.racePodium?.[2] || ''} onChange={(e) => handlePodiumChange('racePodium', 2, e.target.value)} drivers={drivers} teams={teams} disabled={locks.race} usedDrivers={getPodiumUsedDrivers('racePodium')} />
+                            <DriverSelect id="raceP3" value={prediction.racePodium?.[2] || ''} onChange={(e) => handlePodiumChange('racePodium', 2, e.target.value)} drivers={drivers} teams={teams} disabled={isLocked} usedDrivers={getPodiumUsedDrivers('racePodium')} />
                          </div>
                      </div>
                 </div>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
                     <div>
                         <label htmlFor="fastestLap" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Vuelta Rápida</label>
-                        <DriverSelect id="fastestLap" value={prediction.fastestLap || ''} onChange={handleChange} drivers={drivers} teams={teams} disabled={locks.race} />
+                        <DriverSelect id="fastestLap" value={prediction.fastestLap || ''} onChange={handleChange} drivers={drivers} teams={teams} disabled={isLocked} />
                     </div>
                     <div>
                         <label htmlFor="driverOfTheDay" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Piloto del Día</label>
-                        <DriverSelect id="driverOfTheDay" value={prediction.driverOfTheDay || ''} onChange={handleChange} drivers={drivers} teams={teams} disabled={locks.race} />
+                        <DriverSelect id="driverOfTheDay" value={prediction.driverOfTheDay || ''} onChange={handleChange} drivers={drivers} teams={teams} disabled={isLocked} />
                     </div>
                  </div>
            </div>
