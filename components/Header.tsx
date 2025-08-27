@@ -134,11 +134,14 @@ const Header: React.FC = () => {
 
             // Mark non-actionable notifications as seen after loading
             setTimeout(async () => {
-                const notifIds = enrichedNotifications
-                    .filter(n => n.type !== 'tournament_invite')
+                const toMark = enrichedNotifications
+                    .filter(n => n.type !== 'tournament_invite' && !n.seen)
                     .map(p => p.id);
-                if (notifIds.length > 0) {
-                    await db.markNotificationsAsSeen(notifIds);
+                if (toMark.length > 0) {
+                    await db.markNotificationsAsSeen(toMark);
+                    setNotifications(prev =>
+                        prev.map(n => toMark.includes(n.id) ? { ...n, seen: true } : n)
+                    );
                 }
             }, 2000);
         } catch (error) {
@@ -269,7 +272,9 @@ const Header: React.FC = () => {
     }
   }
 
-  const unseenCount = notifications.filter(n => n.type !== 'poke' && n.type !== 'tournament_invite_accepted' && n.type !== 'tournament_invite_declined').length;
+  const unseenCount = notifications.filter(
+      n => !n.seen && n.type !== 'poke' && n.type !== 'tournament_invite_accepted' && n.type !== 'tournament_invite_declined'
+  ).length;
 
   return (
     <header className="bg-[var(--background-medium)]/80 backdrop-blur-sm border-b border-[var(--border-color)] sticky top-0 z-50">
