@@ -663,8 +663,10 @@ const ResultsManagement: React.FC = () => {
     const handleUndoChanges = () => {
         if (!selectedGp) return;
         if (window.confirm("¿Estás seguro de que quieres deshacer todos los cambios? Se restaurará la última versión guardada.")) {
-            setEditableResult(officialResult || draftResult || { gpId: selectedGp.id });
-            setManualOverrides(officialResult?.manualOverrides || {});
+            const originalResult = officialResult || draftResult || { gpId: selectedGp.id };
+            // Use deep copy to prevent reference issues
+            setEditableResult(JSON.parse(JSON.stringify(originalResult)));
+            setManualOverrides(JSON.parse(JSON.stringify(officialResult?.manualOverrides || {})));
         }
     };
     
@@ -687,15 +689,15 @@ const ResultsManagement: React.FC = () => {
                     <td className="py-2 text-center text-sm text-[var(--text-secondary)]">{draftValue?.map((d:string) => drivers.find(dr => dr.id === d)?.name || 'N/A').join(', ') || 'N/A'}</td>
                     <td className="py-2">
                         <div className="space-y-2">
-                         {(editableValue || [null, null, null]).map((val: string, i: number) => (
+                         {Array.from({ length: 3 }).map((_, i) => (
                              <DriverSelect 
                                 key={i} 
                                 id={`${field}-${i}`} 
-                                value={val || ''} 
+                                value={(editableValue && editableValue[i]) || ''} 
                                 onChange={(e) => {
-                                    const newPodium = [...(editableValue || [null, null, null])];
-                                    newPodium[i] = e.target.value || null;
-                                    handleFieldChange(field, newPodium);
+                                    const currentPodium = [...(editableValue || [undefined, undefined, undefined])];
+                                    currentPodium[i] = e.target.value || undefined;
+                                    handleFieldChange(field, currentPodium);
                                 }} 
                                 isManual={isManual}/>
                          ))}
