@@ -1,33 +1,18 @@
 // firebaseconfig.ts
-// FIX: Switched to Firebase v8 compat imports to resolve module export errors.
-// This assumes the project has an older version of the Firebase SDK installed.
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/auth';
 import 'firebase/compat/firestore';
-import 'firebase/compat/functions';
 
-// ==========================================================================================
-// ¡ACCIÓN REQUERIDA! La configuración de Firebase es inválida y debe ser reemplazada.
-//
-// Sigue estos pasos para obtener tu configuración correcta:
-// 1. Ve a tu proyecto en la consola de Firebase: https://console.firebase.google.com/
-// 2. Haz clic en el icono de engranaje (Configuración del proyecto) en la esquina superior izquierda.
-// 3. En la pestaña "General", desplázate hacia abajo hasta "Tus apps".
-// 4. Selecciona tu aplicación web (o créala si no existe).
-// 5. En "SDK de Firebase", elige la opción "Configuración".
-// 6. Copia el objeto de configuración (firebaseConfig) y pégalo aquí abajo, reemplazando
-//    el objeto de ejemplo.
-// ==========================================================================================
 const firebaseConfig = {
   apiKey: "AIzaSyCLo-DqqiWikm0QVBCUdtMf6_vK-uN9kj0",
   authDomain: "f1prode-58763.firebaseapp.com",
+  databaseURL: "https://f1prode-58763-default-rtdb.firebaseio.com",
   projectId: "f1prode-58763",
   storageBucket: "f1prode-58763.firebasestorage.app",
   messagingSenderId: "452234982033",
   appId: "1:452234982033:web:e26c4f3d02c20a68fb4530",
-  measurementId: "TG-4GV8G7VESP" // Opcional
+  measurementId: "G-4GV8G7VESP"
 };
-
 
 // Evita doble init con HMR
 if (!firebase.apps.length) {
@@ -49,5 +34,3 @@ firestoreDb.enablePersistence().catch((err) => {
         console.warn('Firebase persistence failed: unimplemented. Browser not supported.');
     }
 });
-
-export const functions = firebase.functions();
