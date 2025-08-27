@@ -56,7 +56,9 @@ const Header: React.FC = () => {
     const fetchNextGp = async () => {
         const schedule = await db.getSchedule();
         const now = new Date();
-        const upcomingGps = schedule.filter(gp => new Date(gp.events.race) >= now);
+        const upcomingGps = schedule
+            .filter(gp => new Date(gp.events.race) >= now)
+            .sort((a, b) => new Date(a.events.race).getTime() - new Date(b.events.race).getTime());
         setNextGp(upcomingGps[0] || null);
     };
     fetchNextGp();

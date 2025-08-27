@@ -92,7 +92,10 @@ const HomePage: React.FC = () => {
                 const finishedGpsWithResult = schedule.filter(gp => 
                     new Date(gp.events.race) < now && officialResults.some(r => r.gpId === gp.id)
                 );
-                const upcomingGps = schedule.filter(gp => new Date(gp.events.race) >= now);
+                const upcomingGps = schedule
+                    .filter(gp => new Date(gp.events.race) >= now)
+                    .sort((a, b) => new Date(a.events.race).getTime() - new Date(b.events.race).getTime());
+
 
                 const lastFinishedGp = finishedGpsWithResult.pop();
 
