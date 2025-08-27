@@ -11,6 +11,7 @@ import AdminPage from './pages/AdminPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import SearchPage from './pages/SearchPage';
+import ResultsReviewPage from './pages/ResultsReviewPage';
 
 const PrivateRoute: React.FC<{ children: React.ReactNode, adminOnly?: boolean }> = ({ children, adminOnly = false }) => {
     const { user, loading } = useAuth();
@@ -48,6 +49,9 @@ const App: React.FC = () => {
                         } />
                         <Route path="/tournaments" element={
                             <PrivateRoute><TournamentsPage /></PrivateRoute>
+                        } />
+                         <Route path="/results/:userId" element={
+                            <PrivateRoute><ResultsReviewPage /></PrivateRoute>
                         } />
 
                         <Route path="/admin" element={

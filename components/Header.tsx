@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -200,13 +201,16 @@ const Header: React.FC = () => {
                 </div>
             );
         case 'results':
+            if (!user) return null;
             return (
-                 <div className="flex items-center space-x-3">
-                    <span className="text-2xl flex-shrink-0">🏁</span>
-                    <p className="text-sm">
-                        Tus resultados para el <span className="font-bold">{notification.gpName}</span> han sido actualizados.
-                    </p>
-                </div>
+                <Link to={`/results/${user.id}`} onClick={() => setIsNotificationsOpen(false)}>
+                    <div className="flex items-center space-x-3">
+                        <span className="text-2xl flex-shrink-0">🏁</span>
+                        <p className="text-sm">
+                            Tus resultados para el <span className="font-bold">{notification.gpName}</span> han sido actualizados.
+                        </p>
+                    </div>
+                </Link>
             );
         case 'points_adjustment':
             return (
@@ -330,7 +334,7 @@ const Header: React.FC = () => {
                             {notifications.length > 0 ? (
                                 <ul className="max-h-96 overflow-y-auto">
                                     {notifications.map(notification => (
-                                        <li key={notification.id} className={`p-3 border-t border-[var(--border-color)] transition-opacity ${notification.seen ? 'opacity-60' : ''}`}>
+                                        <li key={notification.id} className={`p-3 border-t border-[var(--border-color)] transition-opacity ${notification.seen ? 'opacity-60' : ''} ${notification.type === 'results' ? 'hover:bg-[var(--background-light)]' : ''}`}>
                                             {renderNotification(notification)}
                                         </li>
                                     ))}

@@ -1,3 +1,4 @@
+
 export interface User {
   id: string;
   name: string;
@@ -151,6 +152,19 @@ export interface Score {
     driverOfTheDay: number;
   }
 }
+
+export interface GpScore {
+  totalPoints: number;
+  breakdown: {
+    pole: number;
+    sprintPole: number;
+    sprintPodium: number;
+    racePodium: number;
+    fastestLap: number;
+    driverOfTheDay: number;
+  };
+}
+
 
 export type ScoreDetail = {
   exactPole: number;

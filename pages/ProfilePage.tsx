@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { Avatar as AvatarType, SeasonTotal, User } from '../types';
 import Avatar from '../components/common/Avatar';
 import AvatarEditor from '../components/common/AvatarEditor';
@@ -20,6 +20,7 @@ const ProfilePage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [canPoke, setCanPoke] = useState(false);
     const [pokeCooldown, setPokeCooldown] = useState(false);
+    const [hasAnyResults, setHasAnyResults] = useState(false);
 
     const isOwnProfile = currentUser?.id === userId;
 
@@ -31,9 +32,10 @@ const ProfilePage: React.FC = () => {
             }
             setLoading(true);
             try {
-                const [userToView, seasonTotals] = await Promise.all([
+                const [userToView, seasonTotals, officialResults] = await Promise.all([
                     db.getUserById(userId),
-                    db.calculateSeasonTotals()
+                    db.calculateSeasonTotals(),
+                    db.getOfficialResults(),
                 ]);
 
                 if (userToView) {
@@ -46,6 +48,7 @@ const ProfilePage: React.FC = () => {
                     
                     const userStats = seasonTotals.find(s => s.userId === userToView.id);
                     setStats(userStats || null);
+                    setHasAnyResults(officialResults.length > 0);
                 } else {
                     setProfileUser(null);
                 }
@@ -186,6 +189,17 @@ const ProfilePage: React.FC = () => {
                         </div>
                     ) : (
                         <p className="text-[var(--text-secondary)]">Aún no hay estadísticas disponibles para esta temporada.</p>
+                    )}
+
+                    {hasAnyResults && profileUser && (
+                        <div className="mt-6">
+                            <Link
+                                to={`/results/${profileUser.id}`}
+                                className="w-full block text-center bg-[var(--accent-blue)] text-black font-bold py-3 px-6 rounded-md transition-all hover:bg-opacity-80 transform hover:scale-105"
+                            >
+                                Ver Resultados del Último GP
+                            </Link>
+                        </div>
                     )}
 
                     {!isOwnProfile && currentUser && (
