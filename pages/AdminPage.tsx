@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
+import { geminiService } from '../services/geminiService';
 import { GrandPrix, Driver, Team, Result, OfficialResult, PointAdjustment, User } from '../types';
 
 type AdminTab = 'results' | 'users' | 'calendar' | 'drivers';
@@ -350,12 +351,33 @@ const CalendarManagement: React.FC = () => {
         }
     };
 
+    const handleFetchFromAI = async () => {
+        if (!window.confirm("¿Seguro que quieres reemplazar el calendario actual con datos de la IA para 2025?")) return;
+        setLoading(true);
+        try {
+            const newSchedule = await geminiService.fetchSchedule(2025);
+            if (newSchedule) {
+                await db.replaceSchedule(newSchedule);
+                await loadData();
+                alert("Calendario actualizado desde la IA.");
+            }
+        } catch (error) {
+             console.error("Error fetching schedule from Gemini:", error);
+             alert("No se pudo cargar el calendario automáticamente desde la IA.");
+        } finally {
+            setLoading(false);
+        }
+    }
+
     return (
         <div className="bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)]">
             <h2 className="text-2xl font-bold f1-red-text mb-4">Gestión de Calendario</h2>
             <div className="mb-4 space-x-4">
                 <button onClick={handleResetAndSeed} disabled={loading} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 transition-colors">
                     {loading ? 'Inicializando...' : 'Resetear y Sembrar Firebase'}
+                </button>
+                 <button onClick={handleFetchFromAI} disabled={loading} className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 transition-colors">
+                    {loading ? 'Cargando...' : 'Cargar Calendario 2025 con IA'}
                 </button>
             </div>
 
@@ -619,6 +641,30 @@ const ResultsManagement: React.FC = () => {
         loadGpData();
     }, [selectedGp]);
     
+    const handleFetchResults = async () => {
+        if (!selectedGp) return;
+        setLoading(true);
+        try {
+            const newDraft = await geminiService.fetchDraftResults(selectedGp, drivers);
+            if (newDraft) {
+                await db.saveDraftResult(newDraft);
+                setDraftResult(newDraft);
+                const currentOfficial = await db.getOfficialResult(selectedGp.id);
+                const overriddenKeys = Object.keys(currentOfficial?.manualOverrides || {});
+                
+                const newEditable = {...editableResult, ...newDraft};
+                overriddenKeys.forEach(key => {
+                     (newEditable as any)[key] = (currentOfficial as any)[key];
+                })
+                setEditableResult(newEditable);
+            }
+        } catch(error) {
+            console.error("Error fetching draft results from Gemini:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handlePublish = async () => {
         if(!selectedGp || !user) return;
         setLoading(true);
@@ -694,8 +740,11 @@ const ResultsManagement: React.FC = () => {
 
             {selectedGp && (loading ? <p>Cargando datos del GP...</p> :
                 <div>
+                     <button onClick={handleFetchResults} disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 transition-colors">
+                        {loading ? 'Obteniendo datos...' : 'Obtener Borrador de Resultados (IA)'}
+                    </button>
                     {officialResult && <p className="text-green-400 mt-2 text-sm">Estos resultados ya han sido publicados el {new Date(officialResult.publishedAt).toLocaleDateString()}.</p>}
-
+                    
                     <table className="w-full mt-6 text-left">
                         <thead className="border-b-2 border-[var(--border-color)]">
                             <tr>

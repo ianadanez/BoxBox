@@ -274,43 +274,6 @@ export const db = {
       if (snapshot.empty) return undefined;
       return snapshot.docs[0].data() as Tournament;
   },
-  leaveTournament: async (userId: string, tournamentId: string): Promise<boolean> => {
-      try {
-          const tournamentRef = tournamentsCol.doc(tournamentId);
-          const tournamentSnap = await tournamentRef.get();
-          if (!tournamentSnap.exists) return false;
-
-          const tournament = tournamentSnap.data() as Tournament;
-          
-          // If creator is leaving and there are other members, transfer ownership
-          if (tournament.creatorId === userId) {
-              const otherMembers = tournament.memberIds.filter(id => id !== userId);
-              
-              if (otherMembers.length === 0) {
-                  // Delete tournament if no other members
-                  await tournamentRef.delete();
-                  return true;
-              } else {
-                  // Transfer ownership to the first remaining member
-                  const newCreatorId = otherMembers[0];
-                  await tournamentRef.update({
-                      creatorId: newCreatorId,
-                      memberIds: firebase.firestore.FieldValue.arrayRemove(userId)
-                  });
-                  return true;
-              }
-          } else {
-              // Regular member leaving
-              await tournamentRef.update({
-                  memberIds: firebase.firestore.FieldValue.arrayRemove(userId)
-              });
-              return true;
-          }
-      } catch (error) {
-          console.error('Error leaving tournament:', error);
-          return false;
-      }
-  },
 
   // Notifications & Invites
   getNotificationsForUser: async (userId: string): Promise<Notification[]> => {
@@ -345,14 +308,8 @@ export const db = {
       
       const notifRef = notificationsCol.doc();
       const invite: TournamentInviteNotification = {
-          id: notifRef.id,
-          toUserId: toUserId,
-          fromUserId: fromUserId,
-          tournamentId: tournamentId,
-          tournamentName: tournamentName,
-          type: 'tournament_invite',
-          timestamp: new Date().toISOString(),
-          seen: false,
+          id: notifRef.id, toUserId, fromUserId, tournamentId, tournamentName,
+          type: 'tournament_invite', timestamp: new Date().toISOString(), seen: false,
       };
       batch.set(notifRef, invite);
 
@@ -432,14 +389,6 @@ export const db = {
       const snapshot = await q.get();
       if (snapshot.empty) return undefined;
       return snapshot.docs[0].data() as PokeNotification;
-  },
-  clearAllPokes: async (): Promise<void> => {
-      const q = notificationsCol.where("type", "==", "poke");
-      const snapshot = await q.get();
-      const batch = firestore.batch();
-      snapshot.docs.forEach(doc => batch.delete(doc.ref));
-      await batch.commit();
-      console.log(`Deleted ${snapshot.docs.length} poke notifications`);
   },
 
   // Admin

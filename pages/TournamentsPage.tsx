@@ -80,25 +80,16 @@ const TournamentsPage: React.FC = () => {
         e.preventDefault();
         if (!newTournamentName.trim() || !user) return;
 
-        try {
-            const tournamentData: Omit<Tournament, 'id' | 'pendingMemberIds'> = {
-                name: newTournamentName,
-                inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
-                creatorId: user.id,
-                memberIds: [user.id]
-            };
-            const newTournament = await db.addTournament(tournamentData);
-            
-            // Update state directly instead of reloading all data
-            setMyTournaments(prev => [...prev, newTournament]);
-            setNewTournamentName('');
-            setView('list');
-            
-            alert(`Torneo "${newTournament.name}" creado exitosamente!`);
-        } catch (error) {
-            console.error('Error creating tournament:', error);
-            alert('Error al crear el torneo. Por favor, intenta de nuevo.');
-        }
+        const tournamentData: Omit<Tournament, 'id' | 'pendingMemberIds'> = {
+            name: newTournamentName,
+            inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
+            creatorId: user.id,
+            memberIds: [user.id]
+        };
+        await db.addTournament(tournamentData);
+        await loadData();
+        setNewTournamentName('');
+        setView('list');
     };
 
     const handleJoinTournament = async (e: React.FormEvent) => {
@@ -140,59 +131,20 @@ const TournamentsPage: React.FC = () => {
     const handleSendInvite = async (invitedUser: User) => {
         if (!user || !selectedTournament) return;
         
-        try {
-            const result = await db.sendTournamentInvite(user.id, invitedUser.id, selectedTournament.id, selectedTournament.name);
-            
-            if (result) {
-                alert(`Se ha enviado una invitación a ${invitedUser.name}.`);
-                // Optimistically update UI
-                setTournamentPendingMembers(prev => [...prev, invitedUser]);
-                setSelectedTournament(prev => prev ? ({ ...prev, pendingMemberIds: [...(prev.pendingMemberIds || []), invitedUser.id] }) : null);
-            } else {
-                alert(`${invitedUser.name} ya es miembro o tiene una invitación pendiente.`);
-            }
-        } catch (error) {
-            console.error('Error sending tournament invite:', error);
-            alert('Error al enviar la invitación. Por favor, intenta de nuevo.');
+        const result = await db.sendTournamentInvite(user.id, invitedUser.id, selectedTournament.id, selectedTournament.name);
+        
+        if (result) {
+            alert(`Se ha enviado una invitación a ${invitedUser.name}.`);
+            // Optimistically update UI
+            setTournamentPendingMembers(prev => [...prev, invitedUser]);
+            setSelectedTournament(prev => prev ? ({ ...prev, pendingMemberIds: [...(prev.pendingMemberIds || []), invitedUser.id] }) : null);
+        } else {
+            alert(`${invitedUser.name} ya es miembro o tiene una invitación pendiente.`);
         }
         
         // Remove user from suggestions and clear search
         setInviteSuggestions(prev => prev.filter(u => u.id !== invitedUser.id));
         setInviteSearchQuery('');
-    };
-
-    const handleLeaveTournament = async () => {
-        if (!user || !selectedTournament) return;
-        
-        const isCreator = user.id === selectedTournament.creatorId;
-        const otherMembers = selectedTournament.memberIds.filter(id => id !== user.id);
-        
-        let confirmMessage = `¿Estás seguro de que quieres salir del torneo "${selectedTournament.name}"?`;
-        
-        if (isCreator) {
-            if (otherMembers.length === 0) {
-                confirmMessage = `Eres el único miembro del torneo "${selectedTournament.name}". Al salir, el torneo será eliminado permanentemente. ¿Continuar?`;
-            } else {
-                confirmMessage = `Al abandonar el torneo "${selectedTournament.name}", la administración se transferirá automáticamente a otro miembro. ¿Continuar?`;
-            }
-        }
-        
-        const confirmLeave = confirm(confirmMessage);
-        if (!confirmLeave) return;
-        
-        try {
-            const success = await db.leaveTournament(user.id, selectedTournament.id);
-            if (success) {
-                alert('Has salido del torneo exitosamente.');
-                setSelectedTournament(null);
-                await loadData(); // Refresh the tournaments list
-            } else {
-                alert('Error al salir del torneo. Por favor, intenta de nuevo.');
-            }
-        } catch (error) {
-            console.error('Error leaving tournament:', error);
-            alert('Error al salir del torneo. Por favor, intenta de nuevo.');
-        }
     };
 
     if (loading && !selectedTournament) {
@@ -207,15 +159,7 @@ const TournamentsPage: React.FC = () => {
         const isCreator = user?.id === selectedTournament.creatorId;
         return (
             <div className="container mx-auto p-4 md:p-8 max-w-7xl">
-                <div className="flex justify-between items-center mb-6">
-                    <button onClick={() => setSelectedTournament(null)} className="text-[var(--accent-red)] hover:opacity-80 transition-opacity">&larr; Volver a mis torneos</button>
-                    <button 
-                        onClick={handleLeaveTournament}
-                        className="bg-transparent border border-red-500 text-red-500 hover:bg-red-500 hover:text-white font-bold py-2 px-4 rounded-md transition-colors"
-                    >
-                        {isCreator ? 'Abandonar torneo' : 'Salir del torneo'}
-                    </button>
-                </div>
+                <button onClick={() => setSelectedTournament(null)} className="mb-6 text-[var(--accent-red)] hover:opacity-80 transition-opacity">&larr; Volver a mis torneos</button>
                 <h1 className="text-3xl md:text-4xl font-bold mb-2">{selectedTournament.name}</h1>
                 <p className="text-[var(--text-secondary)] mb-6">Código de invitación: <span className="font-mono bg-[var(--background-light)] text-[var(--text-primary)] py-1 px-2 rounded-md">{selectedTournament.inviteCode}</span></p>
                 {loading ? <p>Cargando ranking...</p> : (

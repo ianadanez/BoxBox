@@ -1,7 +1,7 @@
+
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { db } from './services/db';
 import Header from './components/Header';
 import HomePage from './pages/HomePage';
 import PredictionsPage from './pages/PredictionsPage';
@@ -30,11 +30,6 @@ const PrivateRoute: React.FC<{ children: React.ReactNode, adminOnly?: boolean }>
 
 
 const App: React.FC = () => {
-  // Expose db functions globally for debugging
-  React.useEffect(() => {
-    (window as any).db = db;
-  }, []);
-
   return (
     <AuthProvider>
         <HashRouter>
@@ -47,7 +42,7 @@ const App: React.FC = () => {
                         <Route path="/register" element={<RegisterPage />} />
                         <Route path="/search" element={<SearchPage />} />
                         <Route path="/profile/:userId" element={<ProfilePage />} />
-
+                        
                         <Route path="/predict/:gpId" element={
                             <PrivateRoute><PredictionsPage /></PrivateRoute>
                         } />
