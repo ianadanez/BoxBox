@@ -595,8 +595,14 @@ const ResultsManagement: React.FC = () => {
     const [selectedGp, setSelectedGp] = useState<GrandPrix | null>(null);
     const [draftResult, setDraftResult] = useState<Result | null>(null);
     const [officialResult, setOfficialResult] = useState<OfficialResult | null>(null);
+    
     const [editableResult, setEditableResult] = useState<Partial<Result>>({});
     const [manualOverrides, setManualOverrides] = useState<OfficialResult['manualOverrides']>({});
+    
+    // State to hold the pristine, original result for the "Undo" functionality
+    const [initialResult, setInitialResult] = useState<Partial<Result>>({});
+    const [initialManualOverrides, setInitialManualOverrides] = useState<OfficialResult['manualOverrides']>({});
+
     const [drivers, setDrivers] = useState<Driver[]>([]);
     const [loading, setLoading] = useState(false);
     const [loadingData, setLoadingData] = useState(true);
@@ -620,15 +626,32 @@ const ResultsManagement: React.FC = () => {
                     db.getDraftResult(selectedGp.id),
                     db.getOfficialResult(selectedGp.id)
                 ]);
+
+                const resultToEdit = official || draft || { gpId: selectedGp.id };
+                const overridesToEdit = official?.manualOverrides || {};
+
+                // Deep copy to prevent any reference issues
+                const initialResultCopy = JSON.parse(JSON.stringify(resultToEdit));
+                const initialOverridesCopy = JSON.parse(JSON.stringify(overridesToEdit));
+
                 setDraftResult(draft || null);
                 setOfficialResult(official || null);
-                setEditableResult(official || draft || { gpId: selectedGp.id });
-                setManualOverrides(official?.manualOverrides || {});
+                
+                setEditableResult(initialResultCopy);
+                setManualOverrides(initialOverridesCopy);
+
+                // Store the pristine initial state for the undo button
+                setInitialResult(initialResultCopy);
+                setInitialManualOverrides(initialOverridesCopy);
+                
                 setLoading(false);
             } else {
                 setDraftResult(null);
                 setOfficialResult(null);
                 setEditableResult({});
+                setInitialResult({});
+                setManualOverrides({});
+                setInitialManualOverrides({});
             }
         };
         loadGpData();
@@ -655,18 +678,15 @@ const ResultsManagement: React.FC = () => {
         const reason = prompt(`Motivo para el cambio manual de "${field}":`);
         if (reason && user) {
             setManualOverrides(prev => ({...prev, [field]: { user: user.name, reason }}));
-        } else {
-            // User cancelled, do not mark as override
         }
     };
     
     const handleUndoChanges = () => {
         if (!selectedGp) return;
         if (window.confirm("¿Estás seguro de que quieres deshacer todos los cambios? Se restaurará la última versión guardada.")) {
-            const originalResult = officialResult || draftResult || { gpId: selectedGp.id };
-            // Use deep copy to prevent reference issues
-            setEditableResult(JSON.parse(JSON.stringify(originalResult)));
-            setManualOverrides(JSON.parse(JSON.stringify(officialResult?.manualOverrides || {})));
+            // Restore from the pristine initial state, deep-copying again to be safe
+            setEditableResult(JSON.parse(JSON.stringify(initialResult)));
+            setManualOverrides(JSON.parse(JSON.stringify(initialManualOverrides)));
         }
     };
     
@@ -695,8 +715,9 @@ const ResultsManagement: React.FC = () => {
                                 id={`${field}-${i}`} 
                                 value={(editableValue && editableValue[i]) || ''} 
                                 onChange={(e) => {
-                                    const currentPodium = [...(editableValue || [undefined, undefined, undefined])];
-                                    currentPodium[i] = e.target.value || undefined;
+                                    // Using null instead of undefined for empty values to prevent sparse arrays
+                                    const currentPodium = [...(editableValue || [null, null, null])];
+                                    currentPodium[i] = e.target.value || null;
                                     handleFieldChange(field, currentPodium);
                                 }} 
                                 isManual={isManual}/>

@@ -133,7 +133,18 @@ const Header: React.FC = () => {
   const handleMarkAllAsSeen = async () => {
     const unseenIds = notifications.filter(n => !n.seen).map(n => n.id);
     if (unseenIds.length > 0) {
-      await db.markNotificationsAsSeen(unseenIds);
+        // Optimistic UI update for instant feedback
+        const originalNotifications = [...notifications];
+        setNotifications(prev => prev.map(n => unseenIds.includes(n.id) ? { ...n, seen: true } : n));
+        
+        try {
+            await db.markNotificationsAsSeen(unseenIds);
+        } catch (error) {
+            console.error("Failed to mark notifications as seen:", error);
+            // Revert on error
+            setNotifications(originalNotifications);
+            alert("Error al marcar las notificaciones. Inténtalo de nuevo.");
+        }
     }
   };
   
