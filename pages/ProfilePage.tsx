@@ -3,49 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { Avatar as AvatarType, SeasonTotal, User, UserAchievement, Prediction, GrandPrix } from '../types';
+import { Avatar as AvatarType, SeasonTotal, User } from '../types';
 import Avatar from '../components/common/Avatar';
 import AvatarEditor from '../components/common/AvatarEditor';
 import { db } from '../services/db';
-import { ACHIEVEMENTS } from '../constants';
-
-const TrophyCase: React.FC<{ achievements: UserAchievement[], schedule: GrandPrix[] }> = ({ achievements, schedule }) => {
-    
-    if (achievements.length === 0) {
-        return (
-            <div className="text-center p-6 bg-[var(--background-light)] rounded-lg">
-                <p className="text-[var(--text-secondary)]">La vitrina está vacía... ¡por ahora!</p>
-            </div>
-        )
-    }
-
-    return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {achievements.map(ach => {
-                const details = ACHIEVEMENTS[ach.achievementId];
-                if (!details) return null;
-
-                const gp = ach.gpId ? schedule.find(g => g.id === ach.gpId) : null;
-
-                return (
-                    <div key={ach.id} className="bg-[var(--background-light)] p-4 rounded-lg flex items-start space-x-4">
-                        <span className="text-4xl">{details.icon}</span>
-                        <div>
-                            <p className="font-bold text-white">{details.name}</p>
-                            <p className="text-sm text-gray-400">{details.description}</p>
-                            {gp && (
-                                <p className="text-xs text-[var(--accent-blue)] mt-1">
-                                    Ganado en: {gp.name}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                )
-            })}
-        </div>
-    )
-}
-
 
 const ProfilePage: React.FC = () => {
     const { userId } = useParams<{ userId: string }>();
@@ -61,9 +22,6 @@ const ProfilePage: React.FC = () => {
     const [canPoke, setCanPoke] = useState(false);
     const [pokeCooldown, setPokeCooldown] = useState(false);
     const [hasAnyResults, setHasAnyResults] = useState(false);
-    const [achievements, setAchievements] = useState<UserAchievement[]>([]);
-    const [schedule, setSchedule] = useState<GrandPrix[]>([]);
-    const [predictions, setPredictions] = useState<Prediction[]>([]);
 
     const isOwnProfile = currentUser?.id === userId;
 
@@ -75,13 +33,10 @@ const ProfilePage: React.FC = () => {
             }
             setLoading(true);
             try {
-                const [userToView, seasonTotals, officialResults, userAchievements, allGps, userPredictions] = await Promise.all([
+                const [userToView, seasonTotals, officialResults] = await Promise.all([
                     db.getUserById(userId),
                     db.calculateSeasonTotals(),
                     db.getOfficialResults(),
-                    db.getAchievementsForUser(userId),
-                    db.getSchedule(),
-                    db.getPredictionsForUser(userId),
                 ]);
 
                 if (userToView) {
@@ -96,17 +51,6 @@ const ProfilePage: React.FC = () => {
                     setStats(userStats || null);
                     setHasAnyResults(officialResults.length > 0);
                     
-                    // Manually check for 'veterano' achievement as it's not event-driven
-                    const veteranAchievement: UserAchievement | null = userPredictions.length >= 10
-                        ? { id: 'veteran-manual', userId, achievementId: 'veterano', timestamp: new Date().toISOString() }
-                        : null;
-                    
-                    const allAchievements = veteranAchievement ? [...userAchievements, veteranAchievement] : userAchievements;
-
-                    setAchievements(allAchievements);
-                    setSchedule(allGps);
-                    setPredictions(userPredictions);
-
                 } else {
                     setProfileUser(null);
                 }
@@ -223,11 +167,6 @@ const ProfilePage: React.FC = () => {
                            )}
                         </div>
                        )}
-                    </div>
-                    
-                    <div className="bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)]">
-                         <h2 className="text-2xl font-bold f1-red-text mb-4">Vitrina de Logros</h2>
-                         <TrophyCase achievements={achievements} schedule={schedule} />
                     </div>
                 </div>
 

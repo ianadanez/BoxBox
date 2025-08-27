@@ -187,31 +187,3 @@ export interface SeasonTotal {
     details: ScoreDetail;
     pointAdjustments?: PointAdjustment[];
 }
-
-// --- Gamification & H2H ---
-
-export type AchievementId = 'driver_of_the_weekend' | 'hat_trick' | 'podio_perfecto' | 'nostradamus' | 'creador_de_ligas' | 'veterano';
-
-export interface Achievement {
-    id: AchievementId;
-    name: string;
-    description: string;
-    icon: string;
-}
-
-export interface UserAchievement {
-    id: string;
-    userId: string;
-    achievementId: AchievementId;
-    gpId?: number;
-    timestamp: string;
-}
-
-export interface H2HStats {
-    wins: number;
-    losses: number;
-    ties: number;
-    headToHeadGps: number;
-    avgPoints: number;
-    opponentAvgPoints: number;
-}

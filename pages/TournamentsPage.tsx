@@ -1,112 +1,9 @@
-
-
-
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../services/db';
-import { Tournament, User, SeasonTotal, H2HStats } from '../types';
+import { Tournament, User, SeasonTotal } from '../types';
 import Avatar from '../components/common/Avatar';
 import { useNavigate, Link } from 'react-router-dom';
-
-
-const H2HModal: React.FC<{
-    currentUser: User;
-    opponent: User;
-    tournament: Tournament;
-    seasonTotals: SeasonTotal[];
-    onClose: () => void;
-}> = ({ currentUser, opponent, tournament, seasonTotals, onClose }) => {
-    const [stats, setStats] = useState<H2HStats | null>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const calculateH2H = async () => {
-            setLoading(true);
-
-            const tournamentGps = seasonTotals
-                .filter(st => tournament.memberIds.includes(st.userId))
-                .map(st => st.userId); // This logic is simplified, a more robust way is needed
-
-            // This is a simplified calculation. A true H2H would need per-GP scores.
-            // For now, we'll just compare total points.
-            const currentUserScore = seasonTotals.find(s => s.userId === currentUser.id)?.totalPoints || 0;
-            const opponentScore = seasonTotals.find(s => s.userId === opponent.id)?.totalPoints || 0;
-
-            // Mocking more detailed stats for UI purposes
-            const mockStats: H2HStats = {
-                wins: currentUserScore > opponentScore ? 1 : 0,
-                losses: currentUserScore < opponentScore ? 1 : 0,
-                ties: currentUserScore === opponentScore ? 1 : 0,
-                headToHeadGps: 1,
-                avgPoints: currentUserScore,
-                opponentAvgPoints: opponentScore,
-            };
-            
-            // In a real scenario, you would fetch all GP scores for both users
-            // and compare them one by one.
-            // const h2hStats = await db.calculateH2HStats(currentUser, opponent, tournament);
-            
-            setStats(mockStats);
-            setLoading(false);
-        };
-        calculateH2H();
-    }, [currentUser, opponent, tournament, seasonTotals]);
-
-
-    return (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={onClose}>
-            <div className="bg-[var(--background-medium)] border border-[var(--border-color)] rounded-xl shadow-2xl p-6 w-full max-w-2xl" onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-2xl font-bold f1-red-text">Head-to-Head</h2>
-                    <button onClick={onClose} className="text-2xl text-[var(--text-secondary)] hover:text-white">&times;</button>
-                </div>
-                <div className="flex justify-around items-center text-center mb-6">
-                    <div className="flex flex-col items-center">
-                        <Avatar avatar={currentUser.avatar} className="w-20 h-20 mb-2"/>
-                        <p className="font-bold text-lg">{currentUser.name}</p>
-                    </div>
-                    <p className="text-4xl font-mono text-[var(--text-secondary)]">VS</p>
-                    <div className="flex flex-col items-center">
-                        <Avatar avatar={opponent.avatar} className="w-20 h-20 mb-2"/>
-                        <p className="font-bold text-lg">{opponent.name}</p>
-                    </div>
-                </div>
-
-                {loading ? <p className="text-center">Calculando estadísticas...</p> : stats && (
-                    <div className="bg-[var(--background-light)] p-4 rounded-lg">
-                        <div className="grid grid-cols-3 gap-4 text-center">
-                            <div>
-                                <p className="text-4xl font-bold text-green-400">{stats.wins}</p>
-                                <p className="text-sm text-[var(--text-secondary)]">Victorias</p>
-                            </div>
-                             <div>
-                                <p className="text-4xl font-bold text-[var(--text-secondary)]">{stats.ties}</p>
-                                <p className="text-sm text-[var(--text-secondary)]">Empates</p>
-                            </div>
-                            <div>
-                                <p className="text-4xl font-bold text-red-400">{stats.losses}</p>
-                                <p className="text-sm text-[var(--text-secondary)]">Derrotas</p>
-                            </div>
-                        </div>
-                        <div className="border-t border-[var(--border-color)] my-4"></div>
-                         <div className="grid grid-cols-2 gap-4 text-center">
-                            <div>
-                                <p className="text-2xl font-mono text-white">{stats.avgPoints.toFixed(1)}</p>
-                                <p className="text-sm text-[var(--text-secondary)]">Puntos / GP</p>
-                            </div>
-                            <div>
-                                <p className="text-2xl font-mono text-white">{stats.opponentAvgPoints.toFixed(1)}</p>
-                                <p className="text-sm text-[var(--text-secondary)]">Puntos / GP (Rival)</p>
-                            </div>
-                         </div>
-                    </div>
-                )}
-            </div>
-        </div>
-    )
-}
-
 
 const TournamentsPage: React.FC = () => {
     const { user } = useAuth();
@@ -127,7 +24,6 @@ const TournamentsPage: React.FC = () => {
     // State for invite functionality
     const [inviteSearchQuery, setInviteSearchQuery] = useState('');
     const [inviteSuggestions, setInviteSuggestions] = useState<User[]>([]);
-    const [h2hOpponent, setH2hOpponent] = useState<User | null>(null);
 
     const loadData = useCallback(async () => {
         if (!user) return;
@@ -301,12 +197,6 @@ const TournamentsPage: React.FC = () => {
             }
         }
     };
-    
-     const handleCompare = (opponent: User) => {
-        if (user && opponent.id !== user.id) {
-            setH2hOpponent(opponent);
-        }
-    };
 
     if (loading && !selectedTournament) {
         return <div className="text-center p-8">Cargando torneos...</div>
@@ -320,15 +210,6 @@ const TournamentsPage: React.FC = () => {
         const isCreator = user?.id === selectedTournament.creatorId;
         return (
             <div className="container mx-auto p-4 md:p-8 max-w-7xl">
-                {h2hOpponent && (
-                     <H2HModal 
-                        currentUser={user} 
-                        opponent={h2hOpponent}
-                        tournament={selectedTournament}
-                        seasonTotals={tournamentRanking}
-                        onClose={() => setH2hOpponent(null)}
-                    />
-                )}
                 <div className="flex justify-between items-center mb-6">
                     <button onClick={() => setSelectedTournament(null)} className="text-[var(--accent-red)] hover:opacity-80 transition-opacity">&larr; Volver a mis torneos</button>
                     <div className="flex items-center space-x-2">
@@ -356,34 +237,25 @@ const TournamentsPage: React.FC = () => {
                                         <th className="p-3 text-sm font-semibold tracking-wide text-center">Pos</th>
                                         <th className="p-3 text-sm font-semibold tracking-wide" colSpan={2}>Usuario</th>
                                         <th className="p-3 text-sm font-semibold tracking-wide text-right">Puntos</th>
-                                        <th className="p-3 text-sm font-semibold tracking-wide text-center">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {tournamentRanking.map((score, index) => {
-                                        const opponentUser = tournamentMembers.find(m => m.id === score.userId);
-                                        return (
-                                            <tr key={score.userId} className="border-b border-[var(--border-color)]">
-                                                <td className="p-3 text-lg font-bold text-center text-[var(--text-secondary)]">{index + 1}</td>
-                                                <td className="p-2">
-                                                    <Link to={`/profile/${score.userId}`}>
-                                                        <Avatar avatar={score.userAvatar} className="w-10 h-10" />
-                                                    </Link>
-                                                </td>
-                                                <td className="p-2 font-medium">
-                                                    <Link to={`/profile/${score.userId}`} className="hover:text-[var(--accent-red)] transition-colors">
-                                                        {score.userName}
-                                                    </Link>
-                                                </td>
-                                                <td className="p-3 text-right font-mono text-lg font-bold text-[var(--accent-blue)]">{score.totalPoints}</td>
-                                                <td className="p-3 text-center">
-                                                    {opponentUser && user.id !== opponentUser.id && (
-                                                        <button onClick={() => handleCompare(opponentUser)} className="text-xs bg-gray-600 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-md transition-colors">Comparar</button>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        )
-                                    })}
+                                    {tournamentRanking.map((score, index) => (
+                                        <tr key={score.userId} className="border-b border-[var(--border-color)]">
+                                            <td className="p-3 text-lg font-bold text-center text-[var(--text-secondary)]">{index + 1}</td>
+                                            <td className="p-2">
+                                                <Link to={`/profile/${score.userId}`}>
+                                                    <Avatar avatar={score.userAvatar} className="w-10 h-10" />
+                                                </Link>
+                                            </td>
+                                            <td className="p-2 font-medium">
+                                                <Link to={`/profile/${score.userId}`} className="hover:text-[var(--accent-red)] transition-colors">
+                                                    {score.userName}
+                                                </Link>
+                                            </td>
+                                            <td className="p-3 text-right font-mono text-lg font-bold text-[var(--accent-blue)]">{score.totalPoints}</td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>
