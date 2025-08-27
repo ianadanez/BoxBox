@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { NavLink, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { APP_NAME } from '../constants';
@@ -60,7 +60,7 @@ const Header: React.FC = () => {
   }, []);
 
   // Function to load notifications for the currently logged-in user
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     if (!user) {
         setNotifications([]);
         return;
@@ -80,7 +80,7 @@ const Header: React.FC = () => {
     } catch (error) {
         console.error('Error loading notifications:', error);
     }
-  };
+  }, [user]);
 
   // Effect to load notifications when the user logs in or the component mounts
   useEffect(() => {
@@ -89,7 +89,7 @@ const Header: React.FC = () => {
     } else {
       setNotifications([]);
     }
-  }, [user, loadNotifications]);
+  }, [loadNotifications]);
 
   // Debug log to check if notifications are loading
   useEffect(() => {
