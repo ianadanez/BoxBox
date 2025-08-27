@@ -1,5 +1,7 @@
 
-import { User, Team, Driver, GrandPrix, Prediction, OfficialResult, Result, Tournament, Score, SeasonTotal, PointAdjustment, Notification, PokeNotification, TournamentInviteNotification, ResultsNotification, PointsAdjustmentNotification, TournamentInviteAcceptedNotification, TournamentInviteDeclinedNotification, GpScore } from '../types';
+
+
+import { User, Team, Driver, GrandPrix, Prediction, OfficialResult, Result, Tournament, Score, SeasonTotal, PointAdjustment, Notification, PokeNotification, TournamentInviteNotification, ResultsNotification, PointsAdjustmentNotification, TournamentInviteAcceptedNotification, TournamentInviteDeclinedNotification, GpScore, UserAchievement, AchievementId, H2HStats } from '../types';
 import { TEAMS, DRIVERS, GP_SCHEDULE, SCORING_RULES } from '../constants';
 // FIX: Added firebase compat import for FieldValue operations.
 import firebase from 'firebase/compat/app';
@@ -20,6 +22,7 @@ const draftResultsCol = firestore.collection('draft_results');
 const tournamentsCol = firestore.collection('tournaments');
 const pointAdjustmentsCol = firestore.collection('pointAdjustments');
 const notificationsCol = firestore.collection('notifications');
+const userAchievementsCol = firestore.collection('user_achievements');
 
 
 // --- Firestore DB Service Implementation ---
@@ -110,6 +113,11 @@ export const db = {
       const docSnap = await docRef.get();
       return docSnap.exists ? docSnap.data() as Prediction : undefined;
   },
+   getPredictionsForUser: async (userId: string): Promise<Prediction[]> => {
+    const q = predictionsCol.where("userId", "==", userId);
+    const snapshot = await q.get();
+    return snapshot.docs.map(doc => doc.data() as Prediction);
+  },
   getPredictionsForGp: async (gpId: number): Promise<Prediction[]> => {
       const q = predictionsCol.where("gpId", "==", gpId);
       const snapshot = await q.get();
@@ -152,7 +160,8 @@ export const db = {
       const predictionsSnap = await predictionsCol.where("gpId", "==", result.gpId).get();
       const predictions = predictionsSnap.docs.map(p => p.data() as Prediction);
       const gpSnap = await scheduleCol.doc(String(result.gpId)).get();
-      const gp = gpSnap.data() as GrandPrix;
+      // FIX: Ensure gp exists before trying to access its data.
+      const gp = gpSnap.exists ? gpSnap.data() as GrandPrix : undefined;
       
       const userIds = [...new Set(predictions.map(p => p.userId))];
 
@@ -169,12 +178,51 @@ export const db = {
           };
           batch.set(notifRef, notification);
       }
+      
+      // Award achievements
+      const gpScores: {userId: string, score: number}[] = [];
+      for(const prediction of predictions) {
+          const score = await this.calculateGpScore(prediction, result);
+          gpScores.push({ userId: prediction.userId, score: score.totalPoints });
+          
+          let correctPicks = 0;
+          // FIX: Add checks for optional prediction properties to avoid errors.
+          if (result.pole && prediction.pole && result.pole === prediction.pole) correctPicks++;
+          if (result.fastestLap && prediction.fastestLap && result.fastestLap === prediction.fastestLap) correctPicks++;
+          // FIX: Safely access array elements after checking for existence.
+          if (result.racePodium && prediction.racePodium) {
+              if (result.racePodium[0] && result.racePodium[0] === prediction.racePodium[0]) correctPicks++;
+              if (result.racePodium[1] && result.racePodium[1] === prediction.racePodium[1]) correctPicks++;
+              if (result.racePodium[2] && result.racePodium[2] === prediction.racePodium[2]) correctPicks++;
+          }
+          if (correctPicks >= 5) {
+              this.awardAchievement(batch, prediction.userId, 'nostradamus', result.gpId);
+          }
+          // FIX: Add checks for optional properties and safely access array elements.
+          if (result.pole && prediction.pole && result.pole === prediction.pole && result.fastestLap && prediction.fastestLap && result.fastestLap === prediction.fastestLap && result.racePodium && prediction.racePodium && result.racePodium[0] === prediction.racePodium[0]) {
+               this.awardAchievement(batch, prediction.userId, 'hat_trick', result.gpId);
+          }
+          // FIX: Add checks for optional properties before comparing.
+           if (result.racePodium && prediction.racePodium && JSON.stringify(result.racePodium) === JSON.stringify(prediction.racePodium)) {
+               this.awardAchievement(batch, prediction.userId, 'podio_perfecto', result.gpId);
+           }
+      }
+
+      const maxScore = Math.max(...gpScores.map(s => s.score), 0);
+      if (maxScore > 0) {
+          const topScorers = gpScores.filter(s => s.score === maxScore);
+          for(const scorer of topScorers) {
+              this.awardAchievement(batch, scorer.userId, 'driver_of_the_weekend', result.gpId);
+          }
+      }
+      
       await batch.commit();
   },
 
   // Scoring
   calculateGpScore: async (prediction: Prediction, result: OfficialResult): Promise<GpScore> => {
     const score: GpScore = {
+        gpId: result.gpId,
         totalPoints: 0,
         breakdown: {
             pole: 0, sprintPole: 0, sprintPodium: 0,
@@ -222,6 +270,24 @@ export const db = {
     score.totalPoints = Object.values(score.breakdown).reduce((a, b) => a + b, 0);
     
     return score;
+  },
+  getScoresForUser: async (userId: string): Promise<GpScore[]> => {
+    const [predictions, results] = await Promise.all([
+        db.getPredictionsForUser(userId),
+        db.getOfficialResults(),
+    ]);
+
+    const userScores: GpScore[] = [];
+    for(const result of results) {
+        const prediction = predictions.find(p => p.gpId === result.gpId);
+        if (prediction) {
+            const score = await db.calculateGpScore(prediction, result);
+            userScores.push(score);
+        } else {
+             userScores.push({ gpId: result.gpId, totalPoints: 0, breakdown: { pole: 0, sprintPole: 0, sprintPodium: 0, racePodium: 0, fastestLap: 0, driverOfTheDay: 0 }});
+        }
+    }
+    return userScores.sort((a,b) => a.gpId - b.gpId);
   },
   calculateSeasonTotals: async (): Promise<SeasonTotal[]> => {
     const [usersSnap, predictionsSnap, resultsSnap, adjustmentsSnap] = await Promise.all([
@@ -327,7 +393,21 @@ export const db = {
           id: docRef.id,
           pendingMemberIds: [],
       };
-      await docRef.set(newTournament);
+      
+      const batch = firestore.batch();
+      batch.set(docRef, newTournament);
+
+      const existingAchievementSnap = await userAchievementsCol
+        .where("userId", "==", tournamentData.creatorId)
+        .where("achievementId", "==", "creador_de_ligas")
+        .limit(1)
+        .get();
+        
+      if (existingAchievementSnap.empty) {
+          this.awardAchievement(batch, tournamentData.creatorId, 'creador_de_ligas');
+      }
+
+      await batch.commit();
       return newTournament;
   },
   findTournamentByCode: async (code: string): Promise<Tournament | undefined> => {
@@ -371,7 +451,8 @@ export const db = {
       if (!tournamentSnap.exists) return false;
 
       const tournament = tournamentSnap.data() as Tournament;
-      if (tournament.memberIds.includes(toUserId) || tournament.pendingMemberIds?.includes(toUserId)) {
+      // FIX: Add explicit check for tournament.pendingMemberIds to avoid runtime error.
+      if (tournament.memberIds.includes(toUserId) || (tournament.pendingMemberIds && tournament.pendingMemberIds.includes(toUserId))) {
           return false;
       }
 
@@ -465,6 +546,27 @@ export const db = {
       if (snapshot.empty) return undefined;
       return snapshot.docs[0].data() as PokeNotification;
   },
+  
+  // Achievements
+  awardAchievement(batch: firebase.firestore.WriteBatch, userId: string, achievementId: AchievementId, gpId?: number) {
+      const docRef = userAchievementsCol.doc();
+      const achievement: UserAchievement = {
+          id: docRef.id,
+          userId,
+          achievementId,
+          timestamp: new Date().toISOString()
+      };
+      if (gpId) {
+          achievement.gpId = gpId;
+      }
+      batch.set(docRef, achievement);
+  },
+  getAchievementsForUser: async (userId: string): Promise<UserAchievement[]> => {
+    const q = userAchievementsCol.where("userId", "==", userId).orderBy("timestamp", "desc");
+    const snapshot = await q.get();
+    return snapshot.docs.map(doc => doc.data() as UserAchievement);
+  },
+
 
   // Admin
   getPointAdjustments: async (): Promise<PointAdjustment[]> => {

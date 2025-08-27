@@ -1,11 +1,51 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { Avatar as AvatarType, SeasonTotal, User } from '../types';
+import { Avatar as AvatarType, SeasonTotal, User, UserAchievement, Prediction, GrandPrix } from '../types';
 import Avatar from '../components/common/Avatar';
 import AvatarEditor from '../components/common/AvatarEditor';
 import { db } from '../services/db';
+import { ACHIEVEMENTS } from '../constants';
+
+const TrophyCase: React.FC<{ achievements: UserAchievement[], schedule: GrandPrix[] }> = ({ achievements, schedule }) => {
+    
+    if (achievements.length === 0) {
+        return (
+            <div className="text-center p-6 bg-[var(--background-light)] rounded-lg">
+                <p className="text-[var(--text-secondary)]">La vitrina está vacía... ¡por ahora!</p>
+            </div>
+        )
+    }
+
+    return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {achievements.map(ach => {
+                const details = ACHIEVEMENTS[ach.achievementId];
+                if (!details) return null;
+
+                const gp = ach.gpId ? schedule.find(g => g.id === ach.gpId) : null;
+
+                return (
+                    <div key={ach.id} className="bg-[var(--background-light)] p-4 rounded-lg flex items-start space-x-4">
+                        <span className="text-4xl">{details.icon}</span>
+                        <div>
+                            <p className="font-bold text-white">{details.name}</p>
+                            <p className="text-sm text-gray-400">{details.description}</p>
+                            {gp && (
+                                <p className="text-xs text-[var(--accent-blue)] mt-1">
+                                    Ganado en: {gp.name}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                )
+            })}
+        </div>
+    )
+}
+
 
 const ProfilePage: React.FC = () => {
     const { userId } = useParams<{ userId: string }>();
@@ -21,6 +61,9 @@ const ProfilePage: React.FC = () => {
     const [canPoke, setCanPoke] = useState(false);
     const [pokeCooldown, setPokeCooldown] = useState(false);
     const [hasAnyResults, setHasAnyResults] = useState(false);
+    const [achievements, setAchievements] = useState<UserAchievement[]>([]);
+    const [schedule, setSchedule] = useState<GrandPrix[]>([]);
+    const [predictions, setPredictions] = useState<Prediction[]>([]);
 
     const isOwnProfile = currentUser?.id === userId;
 
@@ -32,10 +75,13 @@ const ProfilePage: React.FC = () => {
             }
             setLoading(true);
             try {
-                const [userToView, seasonTotals, officialResults] = await Promise.all([
+                const [userToView, seasonTotals, officialResults, userAchievements, allGps, userPredictions] = await Promise.all([
                     db.getUserById(userId),
                     db.calculateSeasonTotals(),
                     db.getOfficialResults(),
+                    db.getAchievementsForUser(userId),
+                    db.getSchedule(),
+                    db.getPredictionsForUser(userId),
                 ]);
 
                 if (userToView) {
@@ -49,6 +95,18 @@ const ProfilePage: React.FC = () => {
                     const userStats = seasonTotals.find(s => s.userId === userToView.id);
                     setStats(userStats || null);
                     setHasAnyResults(officialResults.length > 0);
+                    
+                    // Manually check for 'veterano' achievement as it's not event-driven
+                    const veteranAchievement: UserAchievement | null = userPredictions.length >= 10
+                        ? { id: 'veteran-manual', userId, achievementId: 'veterano', timestamp: new Date().toISOString() }
+                        : null;
+                    
+                    const allAchievements = veteranAchievement ? [...userAchievements, veteranAchievement] : userAchievements;
+
+                    setAchievements(allAchievements);
+                    setSchedule(allGps);
+                    setPredictions(userPredictions);
+
                 } else {
                     setProfileUser(null);
                 }
@@ -130,43 +188,51 @@ const ProfilePage: React.FC = () => {
 
     return (
         <div className="container mx-auto p-4 md:p-8 max-w-7xl">
-            <div className="flex justify-between items-start mb-8">
-                <h1 className="text-3xl font-bold">Perfil de {isEditing ? '...' : profileUser.name}</h1>
-                {isOwnProfile && !isEditing && (
-                    <button onClick={handleEditClick} className="bg-[var(--accent-red)] hover:opacity-90 text-white font-bold py-2.5 px-6 rounded-md transition-opacity">
-                        Editar Perfil
-                    </button>
-                )}
-            </div>
-            
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)]">
-                   {isEditing && avatar ? (
-                    <form onSubmit={handleSave} className="space-y-8">
-                        <div>
-                            <label htmlFor="displayName" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Nombre visible</label>
-                            <input id="displayName" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full max-w-md bg-[var(--background-light)] border border-[var(--border-color)] rounded-md p-2.5 text-white focus:ring-2 focus:ring-[var(--accent-red)]" />
-                        </div>
-                        
-                        <AvatarEditor avatar={avatar} onAvatarChange={setAvatar} />
+                {/* Main content */}
+                <div className="lg:col-span-2 space-y-8">
+                     <div className="bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)]">
+                       {isEditing && avatar ? (
+                        <form onSubmit={handleSave} className="space-y-8">
+                            <div className="flex justify-between items-start">
+                                <h1 className="text-3xl font-bold">Editando Perfil</h1>
+                                <div className="flex space-x-2">
+                                    <button type="button" onClick={() => setIsEditing(false)} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2.5 px-6 rounded-md transition-colors">Cancelar</button>
+                                    <button type="submit" className="bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-6 rounded-md transition-colors">Guardar</button>
+                                </div>
+                            </div>
+                            <div>
+                                <label htmlFor="displayName" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Nombre visible</label>
+                                <input id="displayName" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full max-w-md bg-[var(--background-light)] border border-[var(--border-color)] rounded-md p-2.5 text-white focus:ring-2 focus:ring-[var(--accent-red)]" />
+                            </div>
+                            
+                            <AvatarEditor avatar={avatar} onAvatarChange={setAvatar} />
 
-                        <div className="flex space-x-4">
-                            <button type="submit" className="bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-6 rounded-md transition-colors">Guardar Cambios</button>
-                            <button type="button" onClick={() => setIsEditing(false)} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2.5 px-6 rounded-md transition-colors">Cancelar</button>
+                        </form>
+                       ) : (
+                        <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-8">
+                           {avatar && <Avatar avatar={avatar} className="w-40 h-40" />}
+                           <div className="flex-grow text-center sm:text-left">
+                               <h2 className="text-4xl font-bold">{profileUser.name}</h2>
+                               <p className="text-[var(--text-secondary)]">Miembro desde {new Date(profileUser.createdAt).toLocaleDateString()}</p>
+                           </div>
+                           {isOwnProfile && (
+                               <button onClick={handleEditClick} className="bg-[var(--accent-red)] hover:opacity-90 text-white font-bold py-2.5 px-6 rounded-md transition-opacity">
+                                    Editar Perfil
+                                </button>
+                           )}
                         </div>
-                    </form>
-                   ) : (
-                    <div className="flex items-center space-x-8">
-                       {avatar && <Avatar avatar={avatar} className="w-40 h-40" />}
-                       <div>
-                           <h2 className="text-4xl font-bold">{profileUser.name}</h2>
-                           <p className="text-[var(--text-secondary)]">Miembro desde {new Date(profileUser.createdAt).toLocaleDateString()}</p>
-                       </div>
+                       )}
                     </div>
-                   )}
+                    
+                    <div className="bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)]">
+                         <h2 className="text-2xl font-bold f1-red-text mb-4">Vitrina de Logros</h2>
+                         <TrophyCase achievements={achievements} schedule={schedule} />
+                    </div>
                 </div>
 
-                <div className="lg:col-span-1 bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)]">
+                {/* Sidebar */}
+                <div className="lg:col-span-1 bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)] self-start">
                     <h2 className="text-2xl font-bold f1-red-text mb-4">Estadísticas</h2>
                      {stats ? (
                         <div className="space-y-4">

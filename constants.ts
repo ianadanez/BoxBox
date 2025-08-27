@@ -1,4 +1,4 @@
-import { Team, Driver, GrandPrix } from './types';
+import { Team, Driver, GrandPrix, Achievement, AchievementId } from './types';
 
 export const APP_NAME = "BoxBox";
 
@@ -20,6 +20,16 @@ export const SCORING_RULES = {
     inPodium: 2,
   },
 };
+
+export const ACHIEVEMENTS: Record<AchievementId, Achievement> = {
+  driver_of_the_weekend: { id: 'driver_of_the_weekend', name: 'Piloto del Fin de Semana', description: 'Logró la puntuación más alta en un Gran Premio.', icon: '🏆' },
+  hat_trick: { id: 'hat_trick', name: 'Hat-Trick', description: 'Acertó Pole, P1 y Vuelta Rápida en una misma carrera.', icon: '🎩' },
+  podio_perfecto: { id: 'podio_perfecto', name: 'Podio Perfecto', description: 'Acertó los 3 puestos del podio en orden exacto.', icon: '✨' },
+  nostradamus: { id: 'nostradamus', name: 'Nostradamus', description: 'Acertó 5 o más resultados en un mismo GP.', icon: '🔮' },
+  creador_de_ligas: { id: 'creador_de_ligas', name: 'Creador de Ligas', description: 'Creó su primer torneo.', icon: '🤝' },
+  veterano: { id: 'veterano', name: 'Veterano', description: 'Ha participado en 10 o más Grandes Premios.', icon: '🏅' },
+};
+
 
 export const LOCK_MINUTES_BEFORE = 5;
 
