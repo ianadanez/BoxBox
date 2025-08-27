@@ -42,7 +42,6 @@ const Header: React.FC = () => {
   const navigate = useNavigate();
 
   const [notifications, setNotifications] = useState<RenderableNotification[]>([]);
-  const [unseenCount, setUnseenCount] = useState(0);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProcessingNotif, setIsProcessingNotif] = useState<string | null>(null);
   const [nextGp, setNextGp] = useState<GrandPrix | null>(null);
@@ -50,6 +49,9 @@ const Header: React.FC = () => {
 
   const notificationContainerRef = useRef<HTMLDivElement>(null);
   
+  // Derived state for unseen count. This prevents synchronization issues.
+  const unseenCount = notifications.filter(n => !n.seen).length;
+
   useEffect(() => {
     const fetchNextGp = async () => {
         const schedule = await db.getSchedule();
@@ -64,7 +66,6 @@ const Header: React.FC = () => {
   useEffect(() => {
     if (!user) {
         setNotifications([]);
-        setUnseenCount(0);
         return;
     }
 
@@ -100,7 +101,6 @@ const Header: React.FC = () => {
         }
         
         setNotifications(processedNotifications);
-        setUnseenCount(processedNotifications.filter(n => !n.seen).length);
     });
 
     return () => unsubscribe();
@@ -125,16 +125,22 @@ const Header: React.FC = () => {
   };
 
   const handleOpenNotifications = async () => {
-    if (notifications.length === 0) return;
-    setIsNotificationsOpen(true);
+    // This function now toggles the panel visibility
+    if (isNotificationsOpen) {
+      setIsNotificationsOpen(false);
+      return;
+    }
 
-    // Mark non-actionable notifications as seen
+    // Open the panel and mark relevant notifications as seen
+    setIsNotificationsOpen(true);
+    if (notifications.length === 0) return;
+
     const notifIdsToMark = notifications
-        .filter(n => !n.seen && n.type !== 'tournament_invite')
-        .map(p => p.id);
+      .filter(n => !n.seen && n.type !== 'tournament_invite')
+      .map(p => p.id);
 
     if (notifIdsToMark.length > 0) {
-        await db.markNotificationsAsSeen(notifIdsToMark);
+      await db.markNotificationsAsSeen(notifIdsToMark);
     }
   };
   
@@ -303,16 +309,20 @@ const Header: React.FC = () => {
                             </span>
                         )}
                     </button>
-                    {isNotificationsOpen && notifications.length > 0 && (
+                    {isNotificationsOpen && (
                         <div className="absolute top-full right-0 mt-3 w-80 bg-[var(--background-medium)] border border-[var(--border-color)] rounded-lg shadow-2xl shadow-black/50 overflow-hidden z-20">
                            <div className="p-3 bg-[var(--background-light)] text-sm font-bold text-[var(--text-primary)]">Notificaciones</div>
-                            <ul className="max-h-96 overflow-y-auto">
-                                {notifications.map(notification => (
-                                    <li key={notification.id} className={`p-3 border-t border-[var(--border-color)] transition-opacity ${notification.seen ? 'opacity-60' : ''}`}>
-                                        {renderNotification(notification)}
-                                    </li>
-                                ))}
-                            </ul>
+                            {notifications.length > 0 ? (
+                                <ul className="max-h-96 overflow-y-auto">
+                                    {notifications.map(notification => (
+                                        <li key={notification.id} className={`p-3 border-t border-[var(--border-color)] transition-opacity ${notification.seen ? 'opacity-60' : ''}`}>
+                                            {renderNotification(notification)}
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="p-4 text-sm text-center text-[var(--text-secondary)]">No tienes notificaciones.</p>
+                            )}
                         </div>
                     )}
                 </div>
