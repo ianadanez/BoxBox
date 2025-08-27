@@ -285,6 +285,16 @@ export const db = {
       if (snapshot.empty) return undefined;
       return snapshot.docs[0].data() as Tournament;
   },
+  leaveTournament: async (userId: string, tournamentId: string): Promise<void> => {
+    const tournamentRef = tournamentsCol.doc(tournamentId);
+    await tournamentRef.update({
+        memberIds: firebase.firestore.FieldValue.arrayRemove(userId)
+    });
+  },
+  deleteTournament: async (tournamentId: string): Promise<void> => {
+      const tournamentRef = tournamentsCol.doc(tournamentId);
+      await tournamentRef.delete();
+  },
 
   // Notifications & Invites
   listenForNotificationsForUser: (userId: string, onUpdate: (notifications: Notification[]) => void): () => void => {

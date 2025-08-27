@@ -42,6 +42,7 @@ const Header: React.FC = () => {
   const navigate = useNavigate();
 
   const [notifications, setNotifications] = useState<RenderableNotification[]>([]);
+  const [unseenCount, setUnseenCount] = useState(0);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProcessingNotif, setIsProcessingNotif] = useState<string | null>(null);
   const [nextGp, setNextGp] = useState<GrandPrix | null>(null);
@@ -63,6 +64,7 @@ const Header: React.FC = () => {
   useEffect(() => {
     if (!user) {
         setNotifications([]);
+        setUnseenCount(0);
         return;
     }
 
@@ -98,6 +100,7 @@ const Header: React.FC = () => {
         }
         
         setNotifications(processedNotifications);
+        setUnseenCount(processedNotifications.filter(n => !n.seen).length);
     });
 
     return () => unsubscribe();
@@ -121,21 +124,18 @@ const Header: React.FC = () => {
     navigate('/');
   };
 
-  const handleOpenNotifications = () => {
+  const handleOpenNotifications = async () => {
     if (notifications.length === 0) return;
     setIsNotificationsOpen(true);
 
     // Mark non-actionable notifications as seen
-    setTimeout(async () => {
-        if (user) {
-            const notifIds = notifications
-                .filter(n => n.type !== 'tournament_invite')
-                .map(p => p.id);
-            if (notifIds.length > 0) {
-                await db.markNotificationsAsSeen(notifIds);
-            }
-        }
-    }, 4000);
+    const notifIdsToMark = notifications
+        .filter(n => !n.seen && n.type !== 'tournament_invite')
+        .map(p => p.id);
+
+    if (notifIdsToMark.length > 0) {
+        await db.markNotificationsAsSeen(notifIdsToMark);
+    }
   };
   
   const handleAcceptInvite = async (notification: TournamentInviteNotification) => {
@@ -297,9 +297,9 @@ const Header: React.FC = () => {
                 <div ref={notificationContainerRef} className="relative">
                     <button onClick={handleOpenNotifications} className="relative text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors p-1">
                         <BellIcon className="h-6 w-6" />
-                        {notifications.length > 0 && (
-                            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent-red)] text-xs font-bold text-white animate-pulse">
-                                {notifications.length}
+                        {unseenCount > 0 && (
+                            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent-red)] text-xs font-bold text-white">
+                                {unseenCount}
                             </span>
                         )}
                     </button>
@@ -308,7 +308,7 @@ const Header: React.FC = () => {
                            <div className="p-3 bg-[var(--background-light)] text-sm font-bold text-[var(--text-primary)]">Notificaciones</div>
                             <ul className="max-h-96 overflow-y-auto">
                                 {notifications.map(notification => (
-                                    <li key={notification.id} className="p-3 border-t border-[var(--border-color)]">
+                                    <li key={notification.id} className={`p-3 border-t border-[var(--border-color)] transition-opacity ${notification.seen ? 'opacity-60' : ''}`}>
                                         {renderNotification(notification)}
                                     </li>
                                 ))}

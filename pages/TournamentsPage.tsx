@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../services/db';
@@ -162,6 +163,42 @@ const TournamentsPage: React.FC = () => {
         setInviteSearchQuery('');
     };
 
+    const handleLeaveTournament = async () => {
+        if (!user || !selectedTournament) return;
+        if (window.confirm(`¿Estás seguro de que quieres salir del torneo "${selectedTournament.name}"?`)) {
+            setIsSubmitting(true);
+            try {
+                await db.leaveTournament(user.id, selectedTournament.id);
+                alert('Has salido del torneo.');
+                setSelectedTournament(null);
+                await loadData();
+            } catch (error) {
+                console.error("Error leaving tournament:", error);
+                alert('Hubo un error al salir del torneo.');
+            } finally {
+                setIsSubmitting(false);
+            }
+        }
+    };
+
+    const handleDeleteTournament = async () => {
+        if (!user || !selectedTournament || user.id !== selectedTournament.creatorId) return;
+        if (window.confirm(`¿Estás SEGURO de que quieres ELIMINAR el torneo "${selectedTournament.name}"? Esta acción no se puede deshacer.`)) {
+            setIsSubmitting(true);
+            try {
+                await db.deleteTournament(selectedTournament.id);
+                alert('Torneo eliminado.');
+                setSelectedTournament(null);
+                await loadData();
+            } catch (error) {
+                console.error("Error deleting tournament:", error);
+                alert('Hubo un error al eliminar el torneo.');
+            } finally {
+                setIsSubmitting(false);
+            }
+        }
+    };
+
     if (loading && !selectedTournament) {
         return <div className="text-center p-8">Cargando torneos...</div>
     }
@@ -174,7 +211,21 @@ const TournamentsPage: React.FC = () => {
         const isCreator = user?.id === selectedTournament.creatorId;
         return (
             <div className="container mx-auto p-4 md:p-8 max-w-7xl">
-                <button onClick={() => setSelectedTournament(null)} className="mb-6 text-[var(--accent-red)] hover:opacity-80 transition-opacity">&larr; Volver a mis torneos</button>
+                <div className="flex justify-between items-center mb-6">
+                    <button onClick={() => setSelectedTournament(null)} className="text-[var(--accent-red)] hover:opacity-80 transition-opacity">&larr; Volver a mis torneos</button>
+                    <div className="flex items-center space-x-2">
+                        {!isCreator && (
+                            <button onClick={handleLeaveTournament} disabled={isSubmitting} className="bg-yellow-600 hover:bg-yellow-700 text-black font-bold py-2 px-4 rounded-md transition-opacity disabled:opacity-50">
+                                {isSubmitting ? 'Saliendo...' : 'Salir del Torneo'}
+                            </button>
+                        )}
+                        {isCreator && (
+                            <button onClick={handleDeleteTournament} disabled={isSubmitting} className="bg-red-800 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition-opacity disabled:opacity-50">
+                                {isSubmitting ? 'Eliminando...' : 'Eliminar Torneo'}
+                            </button>
+                        )}
+                    </div>
+                </div>
                 <h1 className="text-3xl md:text-4xl font-bold mb-2">{selectedTournament.name}</h1>
                 <p className="text-[var(--text-secondary)] mb-6">Código de invitación: <span className="font-mono bg-[var(--background-light)] text-[var(--text-primary)] py-1 px-2 rounded-md">{selectedTournament.inviteCode}</span></p>
                 {loading ? <p>Cargando ranking...</p> : (
