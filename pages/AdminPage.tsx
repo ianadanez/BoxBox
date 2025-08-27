@@ -660,6 +660,14 @@ const ResultsManagement: React.FC = () => {
         }
     };
     
+    const handleUndoChanges = () => {
+        if (!selectedGp) return;
+        if (window.confirm("¿Estás seguro de que quieres deshacer todos los cambios? Se restaurará la última versión guardada.")) {
+            setEditableResult(officialResult || draftResult || { gpId: selectedGp.id });
+            setManualOverrides(officialResult?.manualOverrides || {});
+        }
+    };
+    
     const DriverSelect: React.FC<{id: string, value?: string, onChange: (e:React.ChangeEvent<HTMLSelectElement>) => void, isManual: boolean}> = ({id, value, onChange, isManual}) => (
         <select value={value || ''} onChange={onChange} className={`w-full p-2 bg-[var(--background-light)] rounded border ${isManual ? 'border-2 border-yellow-400' : 'border-[var(--border-color)]'}`}>
             <option value="">N/A</option>
@@ -680,7 +688,16 @@ const ResultsManagement: React.FC = () => {
                     <td className="py-2">
                         <div className="space-y-2">
                          {(editableValue || [null, null, null]).map((val: string, i: number) => (
-                             <DriverSelect key={i} id={`${field}-${i}`} value={val} onChange={(e) => handleFieldChange(field, [...(editableValue || []).slice(0,i), e.target.value, ...(editableValue || []).slice(i+1)])} isManual={isManual}/>
+                             <DriverSelect 
+                                key={i} 
+                                id={`${field}-${i}`} 
+                                value={val || ''} 
+                                onChange={(e) => {
+                                    const newPodium = [...(editableValue || [null, null, null])];
+                                    newPodium[i] = e.target.value || null;
+                                    handleFieldChange(field, newPodium);
+                                }} 
+                                isManual={isManual}/>
                          ))}
                         </div>
                     </td>
@@ -728,10 +745,14 @@ const ResultsManagement: React.FC = () => {
                             <ResultRow field="driverOfTheDay" label="Piloto del Día" />
                         </tbody>
                     </table>
-
-                    <button onClick={handlePublish} disabled={loading} className="mt-6 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 transition-colors">
-                        {loading ? "Publicando..." : "Publicar Resultados Oficiales"}
-                    </button>
+                    <div className="flex items-center space-x-4 mt-6">
+                        <button onClick={handlePublish} disabled={loading} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 transition-colors">
+                            {loading ? "Publicando..." : (officialResult ? "Actualizar Resultados" : "Publicar Resultados Oficiales")}
+                        </button>
+                         <button type="button" onClick={handleUndoChanges} disabled={loading} className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 transition-colors">
+                            Deshacer Cambios
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
