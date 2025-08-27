@@ -21,6 +21,7 @@ const TournamentsPage: React.FC = () => {
     const [inviteCode, setInviteCode] = useState('');
     const [newTournamentName, setNewTournamentName] = useState('');
     const [loading, setLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     
     // State for invite functionality
     const [inviteSearchQuery, setInviteSearchQuery] = useState('');
@@ -78,38 +79,52 @@ const TournamentsPage: React.FC = () => {
 
     const handleCreateTournament = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newTournamentName.trim() || !user) return;
-
-        const tournamentData: Omit<Tournament, 'id' | 'pendingMemberIds'> = {
-            name: newTournamentName,
-            inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
-            creatorId: user.id,
-            memberIds: [user.id]
-        };
-        await db.addTournament(tournamentData);
-        await loadData();
-        setNewTournamentName('');
-        setView('list');
+        if (!newTournamentName.trim() || !user || isSubmitting) return;
+        setIsSubmitting(true);
+        try {
+            const tournamentData: Omit<Tournament, 'id' | 'pendingMemberIds'> = {
+                name: newTournamentName,
+                inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
+                creatorId: user.id,
+                memberIds: [user.id]
+            };
+            await db.addTournament(tournamentData);
+            await loadData();
+            setNewTournamentName('');
+            setView('list');
+        } catch (error) {
+            console.error("Error creating tournament:", error);
+            alert("Hubo un error al crear el torneo. Inténtalo de nuevo.");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const handleJoinTournament = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!inviteCode.trim() || !user) return;
-
-        const tournament = await db.findTournamentByCode(inviteCode);
-        if (tournament) {
-            if (!tournament.memberIds.includes(user.id)) {
-                tournament.memberIds.push(user.id);
-                await db.saveTournament(tournament);
-                await loadData();
-                alert(`¡Te uniste a "${tournament.name}" con éxito!`);
-                setInviteCode('');
-                setView('list');
+        if (!inviteCode.trim() || !user || isSubmitting) return;
+        setIsSubmitting(true);
+        try {
+            const tournament = await db.findTournamentByCode(inviteCode);
+            if (tournament) {
+                if (!tournament.memberIds.includes(user.id)) {
+                    tournament.memberIds.push(user.id);
+                    await db.saveTournament(tournament);
+                    await loadData();
+                    alert(`¡Te uniste a "${tournament.name}" con éxito!`);
+                    setInviteCode('');
+                    setView('list');
+                } else {
+                    alert('Ya eres miembro de este torneo.');
+                }
             } else {
-                alert('Ya eres miembro de este torneo.');
+                alert('Código de invitación no válido.');
             }
-        } else {
-            alert('Código de invitación no válido.');
+        } catch (error) {
+            console.error("Error joining tournament:", error);
+            alert("Hubo un error al unirse al torneo. Inténtalo de nuevo.");
+        } finally {
+            setIsSubmitting(false);
         }
     };
     
@@ -225,28 +240,27 @@ const TournamentsPage: React.FC = () => {
                             <ul className="space-y-3">
                                 {tournamentMembers.map(member => (
                                     <li key={member.id}>
-                                        <Link to={`/profile/${member.id}`} className="flex items-center space-x-3 p-3 bg-[var(--background-light)] rounded-lg hover:bg-[var(--border-color)] transition-colors">
-                                            <Avatar avatar={member.avatar} className="w-8 h-8"/>
-                                            <span className="font-medium">{member.name}</span>
-                                            {member.id === selectedTournament.creatorId && <span className="text-xs text-yellow-400">(Creador)</span>}
+                                        <Link to={`/profile/${member.id}`} className="flex items-center space-x-4 p-2 rounded-lg hover:bg-[var(--background-light)] transition-colors">
+                                            <Avatar avatar={member.avatar} className="w-10 h-10 flex-shrink-0" />
+                                            <div className="flex-grow">
+                                                <p className="font-bold text-white">{member.name}</p>
+                                                {member.id === selectedTournament.creatorId && (
+                                                    <p className="text-xs text-[var(--accent-blue)]">Creador</p>
+                                                )}
+                                            </div>
                                         </Link>
                                     </li>
                                 ))}
                             </ul>
 
-                            {tournamentPendingMembers.length > 0 && (
+                             {isCreator && tournamentPendingMembers.length > 0 && (
                                 <>
-                                    <h3 className="text-lg font-bold text-[var(--text-secondary)] mt-6 mb-3">Invitaciones Pendientes</h3>
+                                    <h3 className="text-xl font-bold mt-6 mb-3">Invitaciones Pendientes</h3>
                                     <ul className="space-y-3">
                                         {tournamentPendingMembers.map(member => (
-                                            <li key={member.id}>
-                                                <div className="flex items-center justify-between space-x-3 p-3 bg-[var(--background-light)]/50 rounded-lg opacity-60">
-                                                    <div className="flex items-center space-x-3">
-                                                        <Avatar avatar={member.avatar} className="w-8 h-8"/>
-                                                        <span className="font-medium italic">{member.name}</span>
-                                                    </div>
-                                                    <span className="text-xs text-yellow-400">Pendiente</span>
-                                                </div>
+                                            <li key={member.id} className="flex items-center space-x-4 p-2 rounded-lg bg-[var(--background-light)]/50">
+                                                <Avatar avatar={member.avatar} className="w-10 h-10 flex-shrink-0" />
+                                                <p className="font-bold text-gray-400">{member.name}</p>
                                             </li>
                                         ))}
                                     </ul>
@@ -260,65 +274,86 @@ const TournamentsPage: React.FC = () => {
     }
 
     return (
-        <div className="container mx-auto p-4 md:p-8 max-w-5xl">
+        <div className="container mx-auto p-4 md:p-8 max-w-7xl">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-bold">Mis Torneos</h1>
                 {view === 'list' && (
-                     <div className="space-x-2">
-                         <button onClick={() => setView('join')} className="bg-transparent border border-[var(--accent-blue)] text-[var(--accent-blue)] hover:bg-[var(--accent-blue)] hover:text-black font-bold py-2 px-4 rounded-md transition-colors">Unirse</button>
-                         <button onClick={() => setView('create')} className="bg-[var(--accent-red)] hover:opacity-90 text-white font-bold py-2 px-4 rounded-md transition-opacity">Crear Torneo</button>
-                     </div>
+                    <div className="space-x-2">
+                        <button onClick={() => setView('create')} className="bg-[var(--accent-red)] hover:opacity-90 text-white font-bold py-2 px-4 rounded-md transition-opacity">
+                            Crear Torneo
+                        </button>
+                        <button onClick={() => setView('join')} className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-md transition-colors">
+                            Unirse a un Torneo
+                        </button>
+                    </div>
                 )}
             </div>
-
-            {view !== 'list' && (
-                <div className="bg-[var(--background-medium)] p-6 rounded-lg mb-8 border border-[var(--border-color)]">
-                    <button onClick={() => setView('list')} className="mb-4 text-[var(--accent-red)] hover:opacity-80 transition-opacity">&larr; Volver</button>
-                    {view === 'create' && (
-                        <form onSubmit={handleCreateTournament}>
-                            <h2 className="text-2xl font-bold mb-4">Crear Nuevo Torneo</h2>
+            
+            {view === 'create' ? (
+                <div className="bg-[var(--background-medium)] p-6 rounded-xl border border-[var(--border-color)] max-w-lg mx-auto">
+                    <h2 className="text-2xl font-bold f1-red-text mb-4">Crear Nuevo Torneo</h2>
+                    <form onSubmit={handleCreateTournament} className="space-y-4">
+                        <div>
                             <label htmlFor="tournamentName" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Nombre del Torneo</label>
                             <input
                                 id="tournamentName"
                                 type="text"
                                 value={newTournamentName}
                                 onChange={(e) => setNewTournamentName(e.target.value)}
-                                className="w-full max-w-md bg-[var(--background-light)] border border-[var(--border-color)] rounded-md p-2 text-white focus:ring-2 focus:ring-[var(--accent-red)]"
                                 required
+                                className="w-full p-2 bg-[var(--background-light)] rounded border border-[var(--border-color)] focus:ring-2 focus:ring-[var(--accent-red)]"
+                                placeholder="Ej: Liga de Campeones F1"
                             />
-                            <button type="submit" className="mt-4 bg-[var(--accent-red)] hover:opacity-90 text-white font-bold py-2 px-4 rounded-md transition-opacity">Crear</button>
-                        </form>
-                    )}
-                    {view === 'join' && (
-                        <form onSubmit={handleJoinTournament}>
-                            <h2 className="text-2xl font-bold mb-4">Unirse a un Torneo</h2>
+                        </div>
+                        <div className="flex space-x-4 pt-2">
+                             <button type="submit" disabled={isSubmitting} className="w-full bg-[var(--accent-red)] hover:opacity-90 text-white font-bold py-3 px-4 rounded-md transition-opacity disabled:opacity-50">
+                                {isSubmitting ? 'Creando...' : 'Crear Torneo'}
+                            </button>
+                            <button type="button" onClick={() => setView('list')} className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-md transition-colors">
+                                Cancelar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            ) : view === 'join' ? (
+                 <div className="bg-[var(--background-medium)] p-6 rounded-xl border border-[var(--border-color)] max-w-lg mx-auto">
+                    <h2 className="text-2xl font-bold f1-red-text mb-4">Unirse a un Torneo</h2>
+                    <form onSubmit={handleJoinTournament} className="space-y-4">
+                        <div>
                             <label htmlFor="inviteCode" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Código de Invitación</label>
                             <input
                                 id="inviteCode"
                                 type="text"
                                 value={inviteCode}
                                 onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                                className="w-full max-w-md bg-[var(--background-light)] border border-[var(--border-color)] rounded-md p-2 text-white uppercase tracking-widest focus:ring-2 focus:ring-[var(--accent-red)]"
-                                placeholder="XXXXXX"
                                 required
+                                className="w-full p-2 bg-[var(--background-light)] rounded border border-[var(--border-color)] focus:ring-2 focus:ring-[var(--accent-blue)] font-mono tracking-widest"
+                                placeholder="CÓDIGO"
                             />
-                            <button type="submit" className="mt-4 bg-[var(--accent-blue)] hover:opacity-90 text-black font-bold py-2 px-4 rounded-md transition-opacity">Unirse</button>
-                        </form>
+                        </div>
+                         <div className="flex space-x-4 pt-2">
+                            <button type="submit" disabled={isSubmitting} className="w-full bg-[var(--accent-blue)] hover:opacity-80 text-black font-bold py-3 px-4 rounded-md transition-opacity disabled:opacity-50">
+                                {isSubmitting ? 'Uniéndote...' : 'Unirse al Torneo'}
+                            </button>
+                             <button type="button" onClick={() => setView('list')} className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-md transition-colors">
+                                Cancelar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {myTournaments.map(t => (
+                        <div key={t.id} onClick={() => setSelectedTournament(t)} className="bg-[var(--background-medium)] p-6 rounded-xl border border-[var(--border-color)] cursor-pointer hover:border-[var(--accent-red)] transition-all transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-red-900/20">
+                            <h3 className="text-xl font-bold truncate mb-2">{t.name}</h3>
+                            <p className="text-[var(--text-secondary)]">{t.memberIds.length} miembro(s)</p>
+                        </div>
+                    ))}
+                    {myTournaments.length === 0 && (
+                        <p className="col-span-full text-center text-[var(--text-secondary)] p-8">No eres miembro de ningún torneo todavía.</p>
                     )}
                 </div>
             )}
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {myTournaments.map(tournament => (
-                    <div key={tournament.id} onClick={() => setSelectedTournament(tournament)} className="bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)] hover:border-[var(--accent-red)] hover:shadow-lg hover:shadow-red-900/20 transition-all duration-300 cursor-pointer transform hover:-translate-y-1">
-                        <h3 className="text-xl font-bold text-[var(--text-primary)]">{tournament.name}</h3>
-                        <p className="text-[var(--text-secondary)]">{tournament.memberIds.length} miembros</p>
-                    </div>
-                ))}
-                 {myTournaments.length === 0 && view === 'list' && !loading && (
-                    <p className="col-span-full text-center text-[var(--text-secondary)] py-8">No estás en ningún torneo. ¡Crea uno o únete con un código!</p>
-                )}
-            </div>
         </div>
     );
 };

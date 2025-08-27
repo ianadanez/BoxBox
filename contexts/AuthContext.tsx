@@ -1,14 +1,8 @@
-
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { User, Avatar } from '../types';
 import { db } from '../services/db';
 import { auth } from '../firebaseConfig';
-import { 
-    createUserWithEmailAndPassword, 
-    signInWithEmailAndPassword, 
-    signOut, 
-    onAuthStateChanged 
-} from 'firebase/auth';
+// FIX: Removed modular auth imports to use compat API with the compat auth instance.
 
 interface RegisterDetails {
   name: string;
@@ -35,7 +29,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    // FIX: Use compat API `onAuthStateChanged` method directly on the auth instance.
+    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
         if (firebaseUser) {
             try {
                 // User is signed in, see docs for a list of available properties
@@ -47,7 +42,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     // This case might happen if user exists in Auth but not in Firestore.
                     // You might want to log them out or create a profile.
                     console.warn("User exists in Auth but not in Firestore. Logging out.");
-                    await signOut(auth);
+                    // FIX: Use compat API `signOut` method directly on the auth instance.
+                    await auth.signOut();
                     setUser(null);
                 }
             } catch (error) {
@@ -65,13 +61,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const login = async (email: string, password = "password"): Promise<void> => {
-    await signInWithEmailAndPassword(auth, email, password);
+    // FIX: Use compat API `signInWithEmailAndPassword` method directly on the auth instance.
+    await auth.signInWithEmailAndPassword(email, password);
     // onAuthStateChanged will handle setting the user state
   };
 
   const register = async (details: RegisterDetails): Promise<void> => {
-    const userCredential = await createUserWithEmailAndPassword(auth, details.email, details.password);
+    // FIX: Use compat API `createUserWithEmailAndPassword` method directly on the auth instance.
+    const userCredential = await auth.createUserWithEmailAndPassword(details.email, details.password);
     const firebaseUser = userCredential.user;
+
+    if (!firebaseUser) {
+        throw new Error("User creation failed, firebase user object is null.");
+    }
 
     const newUser: User = {
         id: firebaseUser.uid, // Use Firebase UID as the user ID
@@ -89,7 +91,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const logout = async () => {
-    await signOut(auth);
+    // FIX: Use compat API `signOut` method directly on the auth instance.
+    await auth.signOut();
     setUser(null);
   };
   

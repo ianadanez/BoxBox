@@ -59,16 +59,14 @@ const Header: React.FC = () => {
     fetchNextGp();
   }, []);
 
-  // Single, robust effect to fetch and process notifications
+  // Single, robust effect to fetch and process notifications in real-time
   useEffect(() => {
     if (!user) {
         setNotifications([]);
         return;
     }
 
-    const fetchAndProcessNotifications = async () => {
-        const rawNotifications = await db.getNotificationsForUser(user.id);
-
+    const unsubscribe = db.listenForNotificationsForUser(user.id, async (rawNotifications) => {
         const fromUserIds = [...new Set(
             rawNotifications
                 .filter((n): n is PokeNotification | TournamentInviteNotification | TournamentInviteAcceptedNotification | TournamentInviteDeclinedNotification => 
@@ -83,7 +81,7 @@ const Header: React.FC = () => {
         let processedNotifications: RenderableNotification[] = rawNotifications;
 
         if (fromUserIds.length > 0) {
-            const users = await db.getUsers();
+            const users = await db.getUsersByIds(fromUserIds);
             const usersById = new Map(users.map(u => [u.id, u]));
             
             processedNotifications = rawNotifications.map(n => {
@@ -99,16 +97,10 @@ const Header: React.FC = () => {
             });
         }
         
-        setNotifications(current => 
-            JSON.stringify(current) !== JSON.stringify(processedNotifications) 
-            ? processedNotifications 
-            : current
-        );
-    };
+        setNotifications(processedNotifications);
+    });
 
-    fetchAndProcessNotifications();
-    const interval = setInterval(fetchAndProcessNotifications, 5000); // Poll every 5 seconds
-    return () => clearInterval(interval);
+    return () => unsubscribe();
   }, [user]);
 
 

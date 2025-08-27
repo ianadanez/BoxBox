@@ -1,6 +1,7 @@
 
 
 
+
 import { User, Team, Driver, GrandPrix, Prediction, OfficialResult, Result, Tournament, Score, SeasonTotal, PointAdjustment, Notification, PokeNotification, TournamentInviteNotification, ResultsNotification, PointsAdjustmentNotification, TournamentInviteAcceptedNotification, TournamentInviteDeclinedNotification } from '../types';
 import { TEAMS, DRIVERS, GP_SCHEDULE, SCORING_RULES } from '../constants';
 // FIX: Added firebase compat import for FieldValue operations.
@@ -30,6 +31,16 @@ export const db = {
   getUsers: async (): Promise<User[]> => {
       // FIX: Use compat API `get()` method.
       const snapshot = await usersCol.get();
+      return snapshot.docs.map(doc => doc.data() as User);
+  },
+  getUsersByIds: async (ids: string[]): Promise<User[]> => {
+      if (ids.length === 0) {
+          return [];
+      }
+      // Firestore 'in' query can take up to 30 elements.
+      // For notifications, this is a safe assumption. For larger queries, chunking would be needed.
+      const q = usersCol.where(firebase.firestore.FieldPath.documentId(), 'in', ids);
+      const snapshot = await q.get();
       return snapshot.docs.map(doc => doc.data() as User);
   },
   getUserByEmail: async (email: string): Promise<User | undefined> => {
@@ -276,10 +287,13 @@ export const db = {
   },
 
   // Notifications & Invites
-  getNotificationsForUser: async (userId: string): Promise<Notification[]> => {
+  listenForNotificationsForUser: (userId: string, onUpdate: (notifications: Notification[]) => void): () => void => {
       const q = notificationsCol.where("toUserId", "==", userId).orderBy("timestamp", "desc").limit(20);
-      const snapshot = await q.get();
-      return snapshot.docs.map(doc => doc.data() as Notification);
+      const unsubscribe = q.onSnapshot(snapshot => {
+          const notifications = snapshot.docs.map(doc => doc.data() as Notification);
+          onUpdate(notifications);
+      });
+      return unsubscribe;
   },
   markNotificationsAsSeen: async (notificationIds: string[]): Promise<void> => {
       if(notificationIds.length === 0) return;
