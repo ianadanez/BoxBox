@@ -21,6 +21,7 @@ interface AuthContextType {
   updateUser: (user: User) => void;
   isAuthenticated: boolean;
   sendPasswordResetEmail: (email: string) => Promise<void>;
+  // FIX: Added applyActionCode to handle email verification.
   applyActionCode: (code: string) => Promise<void>;
 }
 
@@ -92,14 +93,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!firebaseUser) {
         throw new Error("User creation failed, firebase user object is null.");
     }
-    
-    const actionCodeSettings = {
-        url: `${window.location.origin}${window.location.pathname}#/verify-email`,
-        handleCodeInApp: true,
-    };
 
     // Send verification email
-    await firebaseUser.sendEmailVerification(actionCodeSettings);
+    await firebaseUser.sendEmailVerification();
 
     const newUser: User = {
         id: firebaseUser.uid, // Use Firebase UID as the user ID
