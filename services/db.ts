@@ -205,7 +205,8 @@ export const db = {
         
         const correctPositions = [prediction.racePodium[0] === result.racePodium[0], prediction.racePodium[1] === result.racePodium[1], prediction.racePodium[2] === result.racePodium[2]];
         prediction.racePodium.forEach((driverId, index) => {
-            if (driverId && result.racePodium?.includes(driverId) && !correctPositions[index]) {
+            // FIX: Cast tuple to `readonly string[]` to help TypeScript resolve the correct overload for the `includes` method.
+            if (driverId && (result.racePodium as readonly string[]).includes(driverId) && !correctPositions[index]) {
                 score.breakdown.racePodium += SCORING_RULES.racePodium.inPodium;
             }
         });
@@ -220,7 +221,8 @@ export const db = {
 
         const correctSprintPositions = [prediction.sprintPodium[0] === result.sprintPodium[0], prediction.sprintPodium[1] === result.sprintPodium[1], prediction.sprintPodium[2] === result.sprintPodium[2]];
         prediction.sprintPodium.forEach((driverId, index) => {
-            if (driverId && result.sprintPodium?.includes(driverId) && !correctSprintPositions[index]) {
+            // FIX: Cast tuple to `readonly string[]` to help TypeScript resolve the correct overload for the `includes` method.
+            if (driverId && (result.sprintPodium as readonly string[]).includes(driverId) && !correctSprintPositions[index]) {
                 score.breakdown.sprintPodium += SCORING_RULES.sprintPodium.inPodium;
             }
         });
