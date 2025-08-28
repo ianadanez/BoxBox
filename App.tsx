@@ -12,6 +12,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import SearchPage from './pages/SearchPage';
 import ResultsReviewPage from './pages/ResultsReviewPage';
+import EmailVerificationPage from './pages/EmailVerificationPage';
 
 const PrivateRoute: React.FC<{ children: React.ReactNode, adminOnly?: boolean }> = ({ children, adminOnly = false }) => {
     const { user, loading } = useAuth();
@@ -41,6 +42,7 @@ const App: React.FC = () => {
                         <Route path="/" element={<HomePage />} />
                         <Route path="/login" element={<LoginPage />} />
                         <Route path="/register" element={<RegisterPage />} />
+                        <Route path="/verify-email" element={<EmailVerificationPage />} />
                         <Route path="/search" element={<SearchPage />} />
                         <Route path="/profile/:userId" element={<ProfilePage />} />
                         

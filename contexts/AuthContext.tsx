@@ -21,6 +21,7 @@ interface AuthContextType {
   updateUser: (user: User) => void;
   isAuthenticated: boolean;
   sendPasswordResetEmail: (email: string) => Promise<void>;
+  applyActionCode: (code: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -79,6 +80,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await auth.sendPasswordResetEmail(email);
   };
 
+  const applyActionCode = async (code: string): Promise<void> => {
+    await auth.applyActionCode(code);
+  };
+
   const register = async (details: RegisterDetails): Promise<void> => {
     // FIX: Use compat API `createUserWithEmailAndPassword` method directly on the auth instance.
     const userCredential = await auth.createUserWithEmailAndPassword(details.email, details.password);
@@ -88,8 +93,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         throw new Error("User creation failed, firebase user object is null.");
     }
     
+    const actionCodeSettings = {
+        url: `${window.location.origin}${window.location.pathname}#/verify-email`,
+        handleCodeInApp: true,
+    };
+
     // Send verification email
-    await firebaseUser.sendEmailVerification();
+    await firebaseUser.sendEmailVerification(actionCodeSettings);
 
     const newUser: User = {
         id: firebaseUser.uid, // Use Firebase UID as the user ID
@@ -119,7 +129,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, register, updateUser, isAuthenticated: !!user, sendPasswordResetEmail }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, register, updateUser, isAuthenticated: !!user, sendPasswordResetEmail, applyActionCode }}>
       {!loading && children}
     </AuthContext.Provider>
   );

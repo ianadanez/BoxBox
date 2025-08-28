@@ -62,10 +62,6 @@ const LoginPage: React.FC = () => {
         {view === 'login' ? (
           <>
             <h2 className="text-xl text-center text-[var(--text-primary)]">Iniciar Sesión</h2>
-            <div className="text-center text-sm text-[var(--text-secondary)] bg-[var(--background-light)] p-3 rounded-lg">
-                <p><strong>Modo de Prueba:</strong> La contraseña para todas las cuentas de prueba es <strong>password</strong>.</p>
-                <p>Puedes usar: <strong>admin@boxbox.com</strong> o <strong>user1@boxbox.com</strong>, etc.</p>
-            </div>
             <form onSubmit={handleLoginSubmit} className="space-y-6">
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-[var(--text-secondary)]">Email</label>
