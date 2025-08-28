@@ -1,3 +1,4 @@
+
 import { User, Team, Driver, GrandPrix, Prediction, OfficialResult, Result, Tournament, Score, SeasonTotal, PointAdjustment, Notification, PokeNotification, TournamentInviteNotification, ResultsNotification, PointsAdjustmentNotification, TournamentInviteAcceptedNotification, TournamentInviteDeclinedNotification, GpScore } from '../types';
 import { TEAMS, DRIVERS, GP_SCHEDULE, SCORING_RULES } from '../constants';
 // FIX: Added firebase compat import for FieldValue operations.
@@ -286,7 +287,7 @@ export const db = {
                 
                 const correctPositions = [pred.racePodium[0] === result.racePodium[0], pred.racePodium[1] === result.racePodium[1], pred.racePodium[2] === result.racePodium[2]];
                 pred.racePodium.forEach((driverId, index) => {
-                    if (driverId && result.racePodium?.includes(driverId) && !correctPositions[index]) {
+                    if (driverId && (result.racePodium as readonly string[]).includes(driverId) && !correctPositions[index]) {
                         gpPoints += SCORING_RULES.racePodium.inPodium;
                     }
                 });
@@ -301,7 +302,7 @@ export const db = {
 
                 const correctSprintPositions = [pred.sprintPodium[0] === result.sprintPodium[0], pred.sprintPodium[1] === result.sprintPodium[1], pred.sprintPodium[2] === result.sprintPodium[2]];
                 pred.sprintPodium.forEach((driverId, index) => {
-                    if (driverId && result.sprintPodium?.includes(driverId) && !correctSprintPositions[index]) {
+                    if (driverId && (result.sprintPodium as readonly string[]).includes(driverId) && !correctSprintPositions[index]) {
                         gpPoints += SCORING_RULES.sprintPodium.inPodium;
                     }
                 });

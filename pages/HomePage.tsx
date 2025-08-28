@@ -1,11 +1,10 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { GrandPrix, OfficialResult, Driver, Team, SeasonTotal } from '../types';
 import { db } from '../services/db';
 import Countdown from '../components/common/Countdown';
 import Avatar from '../components/common/Avatar';
+import GoogleAd from '../components/common/GoogleAd';
 import { useAuth } from '../contexts/AuthContext';
 
 const getTeamColor = (driverId: string, drivers: Driver[], teams: Team[]) => {
@@ -204,6 +203,13 @@ const HomePage: React.FC = () => {
                     </div>
                 </div>
             </div>
+            
+            {/* AdSense Block */}
+            <div className="mt-8">
+                <h2 className="text-2xl font-bold mb-4 f1-red-text">Publicidad</h2>
+                <GoogleAd slot="REEMPLAZA_ESTO_CON_TU_ID_DE_BLOQUE_DE_ANUNCIO" />
+            </div>
+
         </div>
     );
 };
