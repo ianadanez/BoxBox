@@ -20,6 +20,7 @@ interface AuthContextType {
   register: (details: RegisterDetails) => Promise<void>;
   updateUser: (user: User) => void;
   isAuthenticated: boolean;
+  sendPasswordResetEmail: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,23 +33,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // FIX: Use compat API `onAuthStateChanged` method directly on the auth instance.
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
         if (firebaseUser) {
-            try {
-                // User is signed in, see docs for a list of available properties
-                // https://firebase.google.com/docs/reference/js/firebase.User
-                const userProfile = await db.getUserById(firebaseUser.uid);
-                if (userProfile) {
-                    setUser(userProfile);
-                } else {
-                    // This case might happen if user exists in Auth but not in Firestore.
-                    // You might want to log them out or create a profile.
-                    console.warn("User exists in Auth but not in Firestore. Logging out.");
-                    // FIX: Use compat API `signOut` method directly on the auth instance.
-                    await auth.signOut();
+            // Only proceed if the user's email is verified
+            if (firebaseUser.emailVerified) {
+                try {
+                    const userProfile = await db.getUserById(firebaseUser.uid);
+                    if (userProfile) {
+                        setUser(userProfile);
+                    } else {
+                        console.warn("User exists in Auth but not in Firestore. Logging out.");
+                        await auth.signOut();
+                        setUser(null);
+                    }
+                } catch (error) {
+                    console.error("Error fetching user profile from Firestore:", error);
                     setUser(null);
                 }
-            } catch (error) {
-                console.error("Error fetching user profile from Firestore:", error);
-                setUser(null);
+            } else {
+                 // If email is not verified, ensure user is logged out of the app state.
+                 // This handles cases where a user might still have a session but hasn't verified.
+                 if (user) setUser(null);
             }
         } else {
             // User is signed out
@@ -58,12 +61,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   const login = async (email: string, password = "password"): Promise<void> => {
-    // FIX: Use compat API `signInWithEmailAndPassword` method directly on the auth instance.
-    await auth.signInWithEmailAndPassword(email, password);
+    const userCredential = await auth.signInWithEmailAndPassword(email, password);
+    if (!userCredential.user?.emailVerified) {
+        // Log the user out immediately if their email is not verified
+        await auth.signOut();
+        const error = new Error("El correo electrónico no ha sido verificado.");
+        error.name = 'auth/email-not-verified';
+        throw error;
+    }
     // onAuthStateChanged will handle setting the user state
+  };
+  
+  const sendPasswordResetEmail = async (email: string): Promise<void> => {
+    await auth.sendPasswordResetEmail(email);
   };
 
   const register = async (details: RegisterDetails): Promise<void> => {
@@ -74,6 +87,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!firebaseUser) {
         throw new Error("User creation failed, firebase user object is null.");
     }
+    
+    // Send verification email
+    await firebaseUser.sendEmailVerification();
 
     const newUser: User = {
         id: firebaseUser.uid, // Use Firebase UID as the user ID
@@ -87,7 +103,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     await db.saveUser(newUser);
-    // onAuthStateChanged will handle setting the user state
+    // Log the user out so they have to verify their email before logging in
+    await auth.signOut();
   };
 
   const logout = async () => {
@@ -102,7 +119,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, register, updateUser, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, register, updateUser, isAuthenticated: !!user, sendPasswordResetEmail }}>
       {!loading && children}
     </AuthContext.Provider>
   );

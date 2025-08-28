@@ -26,6 +26,7 @@ const RegisterPage: React.FC = () => {
     
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [isSuccess, setIsSuccess] = useState(false);
     const { register } = useAuth();
     const navigate = useNavigate();
 
@@ -58,7 +59,7 @@ const RegisterPage: React.FC = () => {
 
         try {
             await register({ name, email, password, favoriteTeamId, avatar });
-            navigate('/');
+            setIsSuccess(true);
         } catch (err: any) {
             if (err.code === 'auth/email-already-in-use') {
                 setError('Este email ya está registrado. Intenta iniciar sesión.');
@@ -70,6 +71,23 @@ const RegisterPage: React.FC = () => {
             setLoading(false);
         }
     };
+    
+    if (isSuccess) {
+        return (
+             <div className="flex items-center justify-center min-h-screen bg-[var(--background-dark)] p-4">
+                <div className="w-full max-w-2xl p-8 space-y-6 bg-[var(--background-medium)] rounded-lg shadow-2xl shadow-black/50 border border-[var(--border-color)] text-center">
+                    <h1 className="text-3xl font-bold text-green-400">¡Registro Exitoso!</h1>
+                    <p className="text-lg text-[var(--text-primary)]">Hemos enviado un correo de verificación a <strong>{email}</strong>.</p>
+                    <p className="text-[var(--text-secondary)]">Por favor, haz clic en el enlace de ese correo para activar tu cuenta antes de iniciar sesión.</p>
+                    <div className="pt-4">
+                         <Link to="/login" className="w-full inline-flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-lg font-bold text-white bg-[var(--accent-red)] hover:opacity-90">
+                            Ir a Iniciar Sesión
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <div className="flex items-center justify-center min-h-screen bg-[var(--background-dark)] p-4">
