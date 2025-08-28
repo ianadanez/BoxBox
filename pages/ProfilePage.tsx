@@ -7,6 +7,7 @@ import { Avatar as AvatarType, SeasonTotal, User } from '../types';
 import Avatar from '../components/common/Avatar';
 import AvatarEditor from '../components/common/AvatarEditor';
 import { db } from '../services/db';
+import GoogleAd from '../components/common/GoogleAd';
 
 const ProfilePage: React.FC = () => {
     const { userId } = useParams<{ userId: string }>();
@@ -227,6 +228,11 @@ const ProfilePage: React.FC = () => {
                         </div>
                     )}
                 </div>
+            </div>
+             {/* AdSense Block */}
+            <div className="mt-8">
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)] text-center mb-4">Publicidad</h2>
+                <GoogleAd slot="4912304848" />
             </div>
         </div>
     );

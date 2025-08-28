@@ -206,8 +206,8 @@ const HomePage: React.FC = () => {
             
             {/* AdSense Block */}
             <div className="mt-8">
-                <h2 className="text-2xl font-bold mb-4 f1-red-text">Publicidad</h2>
-                <GoogleAd slot="REEMPLAZA_ESTO_CON_TU_ID_DE_BLOQUE_DE_ANUNCIO" />
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)] text-center mb-4">Publicidad</h2>
+                <GoogleAd slot="7546755783" />
             </div>
 
         </div>

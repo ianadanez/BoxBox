@@ -1,9 +1,11 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../services/db';
 import { User } from '../types';
 import Avatar from '../components/common/Avatar';
+import GoogleAd from '../components/common/GoogleAd';
 
 const SearchPage: React.FC = () => {
     const [allUsers, setAllUsers] = useState<User[]>([]);
@@ -67,6 +69,12 @@ const SearchPage: React.FC = () => {
                     )}
                 </div>
             )}
+
+            {/* AdSense Block */}
+            <div className="mt-12">
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)] text-center mb-4">Publicidad</h2>
+                <GoogleAd slot="9191009943" />
+            </div>
         </div>
     );
 };

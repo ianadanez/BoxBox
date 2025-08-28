@@ -4,6 +4,7 @@ import { db } from '../services/db';
 import { Tournament, User, SeasonTotal } from '../types';
 import Avatar from '../components/common/Avatar';
 import { useNavigate, Link } from 'react-router-dom';
+import GoogleAd from '../components/common/GoogleAd';
 
 const TournamentsPage: React.FC = () => {
     const { user } = useAuth();
@@ -392,17 +393,25 @@ const TournamentsPage: React.FC = () => {
                     </form>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {myTournaments.map(t => (
-                        <div key={t.id} onClick={() => setSelectedTournament(t)} className="bg-[var(--background-medium)] p-6 rounded-xl border border-[var(--border-color)] cursor-pointer hover:border-[var(--accent-red)] transition-all transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-red-900/20">
-                            <h3 className="text-xl font-bold truncate mb-2">{t.name}</h3>
-                            <p className="text-[var(--text-secondary)]">{t.memberIds.length} miembro(s)</p>
+                <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {myTournaments.map(t => (
+                            <div key={t.id} onClick={() => setSelectedTournament(t)} className="bg-[var(--background-medium)] p-6 rounded-xl border border-[var(--border-color)] cursor-pointer hover:border-[var(--accent-red)] transition-all transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-red-900/20">
+                                <h3 className="text-xl font-bold truncate mb-2">{t.name}</h3>
+                                <p className="text-[var(--text-secondary)]">{t.memberIds.length} miembro(s)</p>
+                            </div>
+                        ))}
+                        {myTournaments.length === 0 && (
+                            <p className="col-span-full text-center text-[var(--text-secondary)] p-8">No eres miembro de ningún torneo todavía.</p>
+                        )}
+                    </div>
+                    {view === 'list' && (
+                        <div className="mt-12">
+                            <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)] text-center mb-4">Publicidad</h2>
+                            <GoogleAd slot="REEMPLAZA_CON_ID_TORNEOS" />
                         </div>
-                    ))}
-                    {myTournaments.length === 0 && (
-                        <p className="col-span-full text-center text-[var(--text-secondary)] p-8">No eres miembro de ningún torneo todavía.</p>
                     )}
-                </div>
+                </>
             )}
         </div>
     );
