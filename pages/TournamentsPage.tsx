@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../services/db';
@@ -211,16 +212,16 @@ const TournamentsPage: React.FC = () => {
         const isCreator = user?.id === selectedTournament.creatorId;
         return (
             <div className="container mx-auto p-4 md:p-8 max-w-7xl">
-                <div className="flex justify-between items-center mb-6">
-                    <button onClick={() => setSelectedTournament(null)} className="text-[var(--accent-red)] hover:opacity-80 transition-opacity">&larr; Volver a mis torneos</button>
-                    <div className="flex items-center space-x-2">
+                <div className="flex flex-col-reverse sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                    <button onClick={() => setSelectedTournament(null)} className="self-start text-[var(--accent-red)] hover:opacity-80 transition-opacity">&larr; Volver a mis torneos</button>
+                    <div className="flex items-center space-x-2 w-full sm:w-auto">
                         {!isCreator && (
-                            <button onClick={handleLeaveTournament} disabled={isSubmitting} className="bg-yellow-600 hover:bg-yellow-700 text-black font-bold py-2 px-4 rounded-md transition-opacity disabled:opacity-50">
+                            <button onClick={handleLeaveTournament} disabled={isSubmitting} className="w-full sm:w-auto bg-yellow-600 hover:bg-yellow-700 text-black font-bold py-2 px-4 rounded-md transition-opacity disabled:opacity-50">
                                 {isSubmitting ? 'Saliendo...' : 'Salir del Torneo'}
                             </button>
                         )}
                         {isCreator && (
-                            <button onClick={handleDeleteTournament} disabled={isSubmitting} className="bg-red-800 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition-opacity disabled:opacity-50">
+                            <button onClick={handleDeleteTournament} disabled={isSubmitting} className="w-full sm:w-auto bg-red-800 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition-opacity disabled:opacity-50">
                                 {isSubmitting ? 'Eliminando...' : 'Eliminar Torneo'}
                             </button>
                         )}
@@ -326,10 +327,10 @@ const TournamentsPage: React.FC = () => {
 
     return (
         <div className="container mx-auto p-4 md:p-8 max-w-7xl">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold">Mis Torneos</h1>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+                <h1 className="text-3xl font-bold mb-4 sm:mb-0">Mis Torneos</h1>
                 {view === 'list' && (
-                    <div className="space-x-2">
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                         <button onClick={() => setView('create')} className="bg-[var(--accent-red)] hover:opacity-90 text-white font-bold py-2 px-4 rounded-md transition-opacity">
                             Crear Torneo
                         </button>
@@ -356,7 +357,7 @@ const TournamentsPage: React.FC = () => {
                                 placeholder="Ej: Liga de Campeones F1"
                             />
                         </div>
-                        <div className="flex space-x-4 pt-2">
+                        <div className="flex flex-col sm:flex-row gap-4 pt-2">
                              <button type="submit" disabled={isSubmitting} className="w-full bg-[var(--accent-red)] hover:opacity-90 text-white font-bold py-3 px-4 rounded-md transition-opacity disabled:opacity-50">
                                 {isSubmitting ? 'Creando...' : 'Crear Torneo'}
                             </button>
@@ -382,7 +383,7 @@ const TournamentsPage: React.FC = () => {
                                 placeholder="CÓDIGO"
                             />
                         </div>
-                         <div className="flex space-x-4 pt-2">
+                         <div className="flex flex-col sm:flex-row gap-4 pt-2">
                             <button type="submit" disabled={isSubmitting} className="w-full bg-[var(--accent-blue)] hover:opacity-80 text-black font-bold py-3 px-4 rounded-md transition-opacity disabled:opacity-50">
                                 {isSubmitting ? 'Uniéndote...' : 'Unirse al Torneo'}
                             </button>

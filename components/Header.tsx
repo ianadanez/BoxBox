@@ -121,8 +121,8 @@ const Header: React.FC = () => {
     };
   }, []);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/');
   };
 
@@ -347,12 +347,12 @@ const Header: React.FC = () => {
                 </div>
 
                  <NavLink to={`/profile/${user.id}`} className="flex items-center space-x-3 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
-                    <Avatar avatar={user.avatar} className="w-9 h-9"/>
+                    <Avatar avatar={user.avatar} className="w-8 h-8"/>
                     <span className="font-medium hidden sm:block">{user.name}</span>
                  </NavLink>
                 <button
                   onClick={handleLogout}
-                  className="bg-transparent border border-[var(--accent-red)] text-[var(--accent-red)] hover:bg-[var(--accent-red)] hover:text-white px-4 py-2 rounded-md text-sm font-bold transition-colors hidden sm:block"
+                  className="bg-transparent border border-[var(--accent-red)] text-[var(--accent-red)] hover:bg-[var(--accent-red)] hover:text-white px-4 py-2 rounded-md text-sm font-bold transition-colors hidden md:block"
                 >
                   Salir
                 </button>
@@ -396,7 +396,7 @@ const Header: React.FC = () => {
                     {user && (
                          <button
                             onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }}
-                            className="w-full text-left sm:hidden mt-2 block px-3 py-2 rounded-md text-base font-medium text-[var(--text-secondary)] hover:bg-gray-700 hover:text-white"
+                            className="w-full text-left mt-2 block px-3 py-2 rounded-md text-base font-medium text-[var(--text-secondary)] hover:bg-gray-700 hover:text-white"
                         >
                           Salir
                         </button>

@@ -412,7 +412,7 @@ const CalendarManagement: React.FC = () => {
             )}
 
             <div className="flex justify-end mb-4">
-                <button onClick={handleAddNew} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors">
+                <button onClick={handleAddNew} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors w-full sm:w-auto">
                     + Agregar Nuevo GP
                 </button>
             </div>
@@ -550,7 +550,7 @@ const DriversManagement: React.FC = () => {
              )}
 
             <div className="flex justify-end mb-4">
-                <button onClick={handleAddNew} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors">
+                <button onClick={handleAddNew} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors w-full sm:w-auto">
                     + Agregar Nuevo Piloto
                 </button>
             </div>
@@ -768,11 +768,11 @@ const ResultsManagement: React.FC = () => {
                             <ResultRow field="driverOfTheDay" label="Piloto del Día" />
                         </tbody>
                     </table>
-                    <div className="flex items-center space-x-4 mt-6">
-                        <button onClick={handlePublish} disabled={loading} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 transition-colors">
+                    <div className="flex flex-col sm:flex-row items-center gap-4 mt-6">
+                        <button onClick={handlePublish} disabled={loading} className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 transition-colors">
                             {loading ? "Publicando..." : (officialResult ? "Actualizar Resultados" : "Publicar Resultados Oficiales")}
                         </button>
-                         <button type="button" onClick={handleUndoChanges} disabled={loading} className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 transition-colors">
+                         <button type="button" onClick={handleUndoChanges} disabled={loading} className="w-full sm:w-auto bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 transition-colors">
                             Deshacer Cambios
                         </button>
                     </div>

@@ -139,9 +139,9 @@ const ProfilePage: React.FC = () => {
                      <div className="bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)]">
                        {isEditing && avatar ? (
                         <form onSubmit={handleSave} className="space-y-8">
-                            <div className="flex justify-between items-start">
-                                <h1 className="text-3xl font-bold">Editando Perfil</h1>
-                                <div className="flex space-x-2">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                                <h1 className="text-3xl font-bold mb-4 sm:mb-0">Editando Perfil</h1>
+                                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto self-end">
                                     <button type="button" onClick={() => setIsEditing(false)} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2.5 px-6 rounded-md transition-colors">Cancelar</button>
                                     <button type="submit" className="bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-6 rounded-md transition-colors">Guardar</button>
                                 </div>
@@ -162,7 +162,7 @@ const ProfilePage: React.FC = () => {
                                <p className="text-[var(--text-secondary)]">Miembro desde {new Date(profileUser.createdAt).toLocaleDateString()}</p>
                            </div>
                            {isOwnProfile && (
-                               <button onClick={handleEditClick} className="bg-[var(--accent-red)] hover:opacity-90 text-white font-bold py-2.5 px-6 rounded-md transition-opacity">
+                               <button onClick={handleEditClick} className="w-full sm:w-auto bg-[var(--accent-red)] hover:opacity-90 text-white font-bold py-2.5 px-6 rounded-md transition-opacity">
                                     Editar Perfil
                                 </button>
                            )}
