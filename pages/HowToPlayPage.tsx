@@ -22,7 +22,7 @@ const HowToPlayPage: React.FC = () => {
                 </thead>
                 <tbody className="bg-[var(--background-medium)] divide-y divide-[var(--border-color)]">
                     <tr>
-                        <td className="px-6 py-4 font-semibold">Pole Position (Clasificación)</td>
+                        <td className="px-6 py-4 font-semibold">Pole Position (Clasificación Principal)</td>
                         <td className="px-6 py-4 text-right font-mono font-bold text-[var(--accent-blue)]">{SCORING_RULES.pole}</td>
                     </tr>
                     <tr>
@@ -104,15 +104,15 @@ const HowToPlayPage: React.FC = () => {
             </p>
             <p>Deberás predecir los siguientes resultados:</p>
             <ul className="list-none space-y-2 pl-4">
-                <li className="flex items-center"><ChevronRightIcon className="text-[var(--accent-red)] mr-2 flex-shrink-0" /> Pole Position (Clasificación Principal)</li>
-                <li className="flex items-center"><ChevronRightIcon className="text-[var(--accent-red)] mr-2 flex-shrink-0" /> Podio de la Carrera (P1, P2 y P3)</li>
-                <li className="flex items-center"><ChevronRightIcon className="text-[var(--accent-red)] mr-2 flex-shrink-0" /> Vuelta Rápida</li>
-                <li className="flex items-center"><ChevronRightIcon className="text-[var(--accent-red)] mr-2 flex-shrink-0" /> Piloto del Día</li>
+                <li className="flex items-center"><ChevronRightIcon className="h-5 w-5 text-[var(--accent-red)] mr-2 flex-shrink-0" /> Pole Position (Clasificación Principal)</li>
+                <li className="flex items-center"><ChevronRightIcon className="h-5 w-5 text-[var(--accent-red)] mr-2 flex-shrink-0" /> Podio de la Carrera (P1, P2 y P3)</li>
+                <li className="flex items-center"><ChevronRightIcon className="h-5 w-5 text-[var(--accent-red)] mr-2 flex-shrink-0" /> Vuelta Rápida</li>
+                <li className="flex items-center"><ChevronRightIcon className="h-5 w-5 text-[var(--accent-red)] mr-2 flex-shrink-0" /> Piloto del Día</li>
             </ul>
              <p>En los fines de semana con <strong>formato Sprint</strong>, también deberás predecir:</p>
              <ul className="list-none space-y-2 pl-4">
-                <li className="flex items-center"><ChevronRightIcon className="text-[var(--accent-red)] mr-2 flex-shrink-0" /> Pole del Sprint</li>
-                <li className="flex items-center"><ChevronRightIcon className="text-[var(--accent-red)] mr-2 flex-shrink-0" /> Podio del Sprint (P1, P2 y P3)</li>
+                <li className="flex items-center"><ChevronRightIcon className="h-5 w-5 text-[var(--accent-red)] mr-2 flex-shrink-0" /> Pole del Sprint</li>
+                <li className="flex items-center"><ChevronRightIcon className="h-5 w-5 text-[var(--accent-red)] mr-2 flex-shrink-0" /> Podio del Sprint (P1, P2 y P3)</li>
             </ul>
             <div className="bg-yellow-900/50 border border-yellow-600 text-yellow-300 text-sm p-4 rounded-lg mt-4">
                 <p className="font-bold">¡IMPORTANTE!</p>
