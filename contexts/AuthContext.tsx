@@ -53,7 +53,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             } else {
                  // If email is not verified, ensure user is logged out of the app state.
                  // This handles cases where a user might still have a session but hasn't verified.
-                 if (user) setUser(null);
+                 setUser(null);
             }
         } else {
             // User is signed out
@@ -63,7 +63,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, []);
 
   const login = async (email: string, password = "password"): Promise<void> => {
     const userCredential = await auth.signInWithEmailAndPassword(email, password);
