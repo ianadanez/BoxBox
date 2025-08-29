@@ -288,6 +288,7 @@ const Header: React.FC = () => {
                     <NavLink to={`/predict/${nextGp.id}`} className={navLinkClass}>Predecir</NavLink>
                 )}
                 <NavLink to="/tournaments" className={navLinkClass}>Torneos</NavLink>
+                <NavLink to="/how-to-play" className={navLinkClass}>¿Cómo se Juega?</NavLink>
                 {user?.role === 'admin' && (
                   <NavLink to="/admin" className={navLinkClass}>Admin</NavLink>
                 )}
@@ -387,6 +388,7 @@ const Header: React.FC = () => {
                         <NavLink to={`/predict/${nextGp.id}`} className={mobileNavLinkClass} onClick={() => setIsMobileMenuOpen(false)}>Predecir</NavLink>
                     )}
                     <NavLink to="/tournaments" className={mobileNavLinkClass} onClick={() => setIsMobileMenuOpen(false)}>Torneos</NavLink>
+                    <NavLink to="/how-to-play" className={mobileNavLinkClass} onClick={() => setIsMobileMenuOpen(false)}>¿Cómo se Juega?</NavLink>
                     <NavLink to="/search" className={mobileNavLinkClass} onClick={() => setIsMobileMenuOpen(false)}>Buscar</NavLink>
                     {user?.role === 'admin' && (
                         <NavLink to="/admin" className={mobileNavLinkClass} onClick={() => setIsMobileMenuOpen(false)}>Admin</NavLink>
