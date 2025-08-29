@@ -364,10 +364,17 @@ export const db = {
 
   // Notifications & Invites
   listenForNotificationsForUser: (userId: string, onUpdate: (notifications: Notification[]) => void): () => void => {
-      const q = notificationsCol.where("toUserId", "==", userId).orderBy("timestamp", "desc").limit(20);
+      // FIX: Removed orderBy to prevent query from requiring a composite index.
+      // The listener was likely failing silently because the index was not configured.
+      // Sorting is now handled on the client-side.
+      const q = notificationsCol.where("toUserId", "==", userId).limit(30);
       const unsubscribe = q.onSnapshot(snapshot => {
           const notifications = snapshot.docs.map(doc => doc.data() as Notification);
-          onUpdate(notifications);
+          // Sort client-side to ensure newest are first, then take the top 20 for display
+          notifications.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+          onUpdate(notifications.slice(0, 20));
+      }, err => {
+          console.error("Error listening for notifications:", err);
       });
       return unsubscribe;
   },
