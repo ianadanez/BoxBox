@@ -23,13 +23,16 @@ const Avatar: React.FC<AvatarProps> = ({ avatar, className = 'w-12 h-12' }) => {
 
   const { color, secondaryColor, skinColor, eyes, pattern } = fullAvatar;
 
-  // Use CSS variables for colors used in multiple places NOT inside <defs>
+  // Use CSS variables for colors used in multiple places, now including pattern colors
   const style = {
       '--primary-color': color,
+      '--secondary-color': secondaryColor,
       '--skin-color': skinColor,
       '--eye-color': 'white',
       '--accent-red': '#E10600',
       '--accent-blue': '#00D2FF',
+      '--pattern-dark': '#18181B',
+      '--pattern-light': '#F4F4F5',
   } as React.CSSProperties;
   
   // Unique IDs for patterns and clip paths
@@ -73,24 +76,29 @@ const Avatar: React.FC<AvatarProps> = ({ avatar, className = 'w-12 h-12' }) => {
     <div className={`relative rounded-full overflow-hidden ${className}`}>
       <svg viewBox="0 0 32 32" className="w-full h-full" style={style} aria-label={`Avatar de usuario`}>
         <defs>
-            {/* Unique pattern for chequered eyes, moved here for correctness. */}
-            <pattern id={p_chequered_eyes_id} patternUnits="userSpaceOnUse" width="4" height="4"><rect width="2" height="2" fill="#18181B" /><rect x="2" y="2" width="2" height="2" fill="#18181B" /><rect y="2" width="2" height="2" fill="#F4F4F5" /><rect x="2" width="2" height="2" fill="#F4F4F5" /></pattern>
+            {/* Unique pattern for chequered eyes, now using CSS variables */}
+            <pattern id={p_chequered_eyes_id} patternUnits="userSpaceOnUse" width="4" height="4">
+                <rect width="2" height="2" fill="var(--pattern-dark)" />
+                <rect x="2" y="2" width="2" height="2" fill="var(--pattern-dark)" />
+                <rect y="2" width="2" height="2" fill="var(--pattern-light)" />
+                <rect x="2" width="2" height="2" fill="var(--pattern-light)" />
+            </pattern>
         
             {/* Helmet patterns with direct color injection and unique IDs */}
             <pattern id={p_halftone_id} patternUnits="userSpaceOnUse" width="6" height="6">
-                <circle cx="3" cy="3" r="1.3" fill={secondaryColor} opacity="0.8"/>
+                <circle cx="3" cy="3" r="1.3" fill="var(--secondary-color)" opacity="0.8"/>
             </pattern>
             <pattern id={p_checkers_id} patternUnits="userSpaceOnUse" width="10" height="10">
-                <rect width="5" height="5" fill={secondaryColor} opacity="0.7" />
-                <rect x="5" y="5" width="5" height="5" fill={secondaryColor} opacity="0.7" />
+                <rect width="5" height="5" fill="var(--secondary-color)" opacity="0.7" />
+                <rect x="5" y="5" width="5" height="5" fill="var(--secondary-color)" opacity="0.7" />
             </pattern>
             <pattern id={p_flames_id} patternUnits="userSpaceOnUse" width="32" height="20" >
-                <path d="M-5 20 Q 5 10, 10 0 Q 15 10, 25 20" fill={secondaryColor} opacity="0.7"/>
-                <path d="M15 20 Q 25 10, 30 0 Q 35 10, 45 20" fill={secondaryColor} opacity="0.7"/>
+                <path d="M-5 20 Q 5 10, 10 0 Q 15 10, 25 20" fill="var(--secondary-color)" opacity="0.7"/>
+                <path d="M15 20 Q 25 10, 30 0 Q 35 10, 45 20" fill="var(--secondary-color)" opacity="0.7"/>
             </pattern>
             <pattern id={p_carbon_id} patternUnits="userSpaceOnUse" width="6" height="6">
-                <path d="M 0 0 L 6 6 M -1.5 1.5 L 1.5 4.5 M 4.5 -1.5 L 7.5 1.5" stroke={secondaryColor} strokeWidth="1" opacity="0.4"/>
-                <path d="M 6 0 L 0 6 M 4.5 7.5 L 7.5 4.5 M -1.5 4.5 L 1.5 7.5" stroke={secondaryColor} strokeWidth="1" opacity="0.4"/>
+                <path d="M 0 0 L 6 6 M -1.5 1.5 L 1.5 4.5 M 4.5 -1.5 L 7.5 1.5" stroke="var(--secondary-color)" strokeWidth="1" opacity="0.4"/>
+                <path d="M 6 0 L 0 6 M 4.5 7.5 L 7.5 4.5 M -1.5 4.5 L 1.5 7.5" stroke="var(--secondary-color)" strokeWidth="1" opacity="0.4"/>
             </pattern>
             
             <clipPath id={avatar_clip_id}>
@@ -117,7 +125,7 @@ const Avatar: React.FC<AvatarProps> = ({ avatar, className = 'w-12 h-12' }) => {
             {pattern !== 'none' && (
               <g clipPath={`url(#${helmet_only_clip_id})`}>
                 {pattern === 'stripes' ? (
-                  <rect x="14" y="0" width="4" height="32" fill={secondaryColor} />
+                  <rect x="14" y="0" width="4" height="32" fill="var(--secondary-color)" />
                 ) : (
                   <rect x="0" y="0" width="32" height="32" fill={getPatternUrl(pattern)} />
                 )}
