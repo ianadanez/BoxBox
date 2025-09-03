@@ -171,7 +171,8 @@ export const db = {
               toUserId: userId,
               type: 'results',
               gpId: result.gpId,
-              gpName: gp?.name || `GP ${result.gpId}`,
+              // FIX: Cast gp.name to string to satisfy strict type checking where it could be inferred as 'unknown'.
+              gpName: (gp?.name as string) || `GP ${result.gpId}`,
               timestamp: new Date().toISOString(),
               seen: false,
           };

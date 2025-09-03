@@ -30,46 +30,63 @@ const CloseIcon: React.FC<{className?: string}> = ({className}) => (
     </svg>
 );
 
-// REMOVED BASE64 to use a direct URL approach.
-// User will replace the placeholder URL with their own hosted image link.
-const LOGO_URL_PLACEHOLDER = "https://imgur.com/a/jSqjazT";
+const AppLogo = () => (
+    <img src="https://i.imgur.com/VfzbTsC.png" alt="BoxBox Logo" className="h-10 w-auto" />
+);
 
 
-const NotificationItem: React.FC<{ notif: Notification, users: User[], onAction: (notif: Notification, action: 'accept' | 'decline') => void }> = ({ notif, users, onAction }) => {
-    const fromUser = users.find(u => u.id === (notif as any).fromUserId);
+const NotificationDropdown: React.FC<{ notifications: Notification[], users: User[], onAccept: (notifId: string, tournamentId: string) => void, onDecline: (notifId: string, tournamentId: string) => void }> = ({ notifications, users, onAccept, onDecline }) => {
+    
+    const getUser = (id: string): User | undefined => users.find(u => u.id === id);
 
-    const renderContent = () => {
-        switch (notif.type) {
+    const renderNotificationContent = (n: Notification) => {
+        const fromUser = getUser('fromUserId' in n ? n.fromUserId : '');
+        switch (n.type) {
             case 'poke':
-                return <p><span className="font-bold">{fromUser?.name || 'Alguien'}</span> te ha dado un toque. 👋</p>;
+                return <p><span className="font-bold">{fromUser?.name || 'Alguien'}</span> te ha dado un toque 👋.</p>;
             case 'results':
-                return <p>🏆 ¡Ya están los resultados del <span className="font-bold">{notif.gpName}</span>!</p>;
+                return <p>Ya están los resultados del <span className="font-bold">{n.gpName}</span>.</p>;
             case 'points_adjustment':
-                 return <p>Admin te ha {notif.points > 0 ? 'dado' : 'quitado'} <span className={`font-bold ${notif.points > 0 ? 'text-green-400' : 'text-red-400'}`}>{Math.abs(notif.points)}</span> puntos. Motivo: {notif.reason}</p>;
+                const admin = getUser(n.adminId);
+                const verb = n.points > 0 ? 'añadido' : 'quitado';
+                return <p><span className="font-bold">{admin?.name || 'Un admin'}</span> te ha {verb} <span className="font-bold">{Math.abs(n.points)}</span> puntos. Motivo: {n.reason}</p>;
             case 'tournament_invite':
                 return (
                     <div>
-                        <p><span className="font-bold">{fromUser?.name || 'Alguien'}</span> te ha invitado al torneo <span className="font-bold">{notif.tournamentName}</span>.</p>
+                        <p><span className="font-bold">{fromUser?.name || 'Alguien'}</span> te ha invitado al torneo <span className="font-bold">{n.tournamentName}</span>.</p>
                         <div className="flex space-x-2 mt-2">
-                            <button onClick={() => onAction(notif, 'accept')} className="text-xs bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded-md">Aceptar</button>
-                            <button onClick={() => onAction(notif, 'decline')} className="text-xs bg-red-800 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md">Rechazar</button>
+                            <button onClick={(e) => { e.stopPropagation(); onAccept(n.id, n.tournamentId); }} className="text-xs bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded-md">Aceptar</button>
+                            <button onClick={(e) => { e.stopPropagation(); onDecline(n.id, n.tournamentId); }} className="text-xs bg-red-800 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md">Rechazar</button>
                         </div>
                     </div>
                 );
             case 'tournament_invite_accepted':
-                 return <p>✅ <span className="font-bold">{fromUser?.name || 'Alguien'}</span> ha aceptado tu invitación al torneo <span className="font-bold">{notif.tournamentName}</span>.</p>;
+                 return <p><span className="font-bold">{fromUser?.name || 'Alguien'}</span> ha aceptado tu invitación a <span className="font-bold">{n.tournamentName}</span>.</p>;
             case 'tournament_invite_declined':
-                 return <p>❌ <span className="font-bold">{fromUser?.name || 'Alguien'}</span> ha rechazado tu invitación al torneo <span className="font-bold">{notif.tournamentName}</span>.</p>;
+                return <p><span className="font-bold">{fromUser?.name || 'Alguien'}</span> ha rechazado tu invitación a <span className="font-bold">{n.tournamentName}</span>.</p>;
             default:
                 return <p>Tienes una nueva notificación.</p>;
         }
     };
-    
+
     return (
-        <li className={`p-3 border-b border-[var(--border-color)] ${!notif.seen ? 'bg-red-900/20' : ''}`}>
-            {renderContent()}
-            <span className="text-xs text-gray-500 mt-1 block">{new Date(notif.timestamp).toLocaleString()}</span>
-        </li>
+        <div className="absolute right-0 mt-2 w-80 bg-[var(--background-medium)] rounded-lg shadow-2xl shadow-black/50 border border-[var(--border-color)] overflow-hidden z-20">
+            <div className="p-3 border-b border-[var(--border-color)]">
+                <h3 className="font-bold text-[var(--text-primary)]">Notificaciones</h3>
+            </div>
+            {notifications.length > 0 ? (
+                <ul className="max-h-96 overflow-y-auto">
+                    {notifications.map(n => (
+                        <li key={n.id} className={`p-3 text-sm border-b border-[var(--border-color)] hover:bg-[var(--background-light)] transition-colors ${!n.seen ? 'bg-blue-900/20' : ''}`}>
+                            {renderNotificationContent(n)}
+                            <p className="text-xs text-gray-500 mt-1">{new Date(n.timestamp).toLocaleString()}</p>
+                        </li>
+                    ))}
+                </ul>
+            ) : (
+                <p className="p-4 text-sm text-[var(--text-secondary)] text-center">No tienes notificaciones nuevas.</p>
+            )}
+        </div>
     );
 };
 
@@ -78,201 +95,156 @@ const Header: React.FC = () => {
     const { user, logout, isAuthenticated } = useAuth();
     const navigate = useNavigate();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+    const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
-    const [notificationUsers, setNotificationUsers] = useState<User[]>([]);
-    const notificationsRef = useRef<HTMLDivElement>(null);
-    const [nextGp, setNextGp] = useState<GrandPrix | null>(null);
+    const [usersForNotifs, setUsersForNotifs] = useState<User[]>([]);
+    const notifRef = useRef<HTMLDivElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
 
     const hasUnseenNotifications = notifications.some(n => !n.seen);
 
     useEffect(() => {
-        if (!user) return;
-        
-        const unsubscribe = db.listenForNotificationsForUser(user.id, (newNotifications) => {
-            setNotifications(newNotifications);
-            const userIds = newNotifications
-                .map(n => (n as any).fromUserId)
-                .filter((id, index, self) => id && self.indexOf(id) === index); // Unique IDs
-            
-            if (userIds.length > 0) {
-                db.getUsersByIds(userIds).then(setNotificationUsers);
-            }
-        });
-
-        return () => unsubscribe();
-    }, [user]);
-    
-    useEffect(() => {
-        const getNextGp = async () => {
-            const schedule = await db.getSchedule();
-            const now = new Date();
-            const upcoming = schedule
-                .filter(gp => new Date(gp.events.race) >= now)
-                .sort((a,b) => new Date(a.events.race).getTime() - new Date(b.events.race).getTime());
-            setNextGp(upcoming[0] || null);
+        let unsubscribe: (() => void) | undefined;
+        if (user) {
+            unsubscribe = db.listenForNotificationsForUser(user.id, (newNotifications) => {
+                setNotifications(newNotifications);
+                const userIds = new Set<string>();
+                newNotifications.forEach(n => {
+                    if ('fromUserId' in n) userIds.add(n.fromUserId);
+                    if ('adminId' in n) userIds.add(n.adminId);
+                });
+                if(userIds.size > 0) {
+                    db.getUsersByIds(Array.from(userIds)).then(setUsersForNotifs);
+                }
+            });
+        }
+        return () => {
+            if (unsubscribe) unsubscribe();
         };
-        getNextGp();
-    }, []);
+    }, [user]);
 
-    const handleLogout = async () => {
-        await logout();
-        navigate('/');
-    };
-    
-    const handleToggleNotifications = () => {
-        setIsNotificationsOpen(!isNotificationsOpen);
-        if (hasUnseenNotifications) {
-            const unseenIds = notifications.filter(n => !n.seen).map(n => n.id);
-            db.markNotificationsAsSeen(unseenIds);
-        }
-    };
-
-    const handleNotificationAction = async (notif: Notification, action: 'accept' | 'decline') => {
-        if (notif.type !== 'tournament_invite' || !user) return;
-
-        if (action === 'accept') {
-            const updatedTournament = await db.acceptTournamentInvite(notif.id, user.id, notif.tournamentId);
-            if (updatedTournament) {
-                alert(`Te uniste a ${updatedTournament.name}`);
-            } else {
-                alert('El torneo ya no existe.');
-            }
-        } else {
-            await db.declineTournamentInvite(notif.id, user.id, notif.tournamentId);
-            alert('Invitación rechazada.');
-        }
-    };
-    
      useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
-                setIsNotificationsOpen(false);
+            if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+                setIsNotifOpen(false);
+            }
+             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsMenuOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const activeLinkClass = "bg-[var(--background-light)] text-[var(--text-primary)]";
-    const inactiveLinkClass = "text-[var(--text-secondary)] hover:bg-[var(--background-light)] hover:text-[var(--text-primary)]";
-    const linkClasses = `px-3 py-2 rounded-md text-sm font-medium transition-colors`;
+    const handleLogout = async () => {
+        await logout();
+        navigate('/');
+    };
+
+    const toggleNotifications = () => {
+        const wasOpen = isNotifOpen;
+        setIsNotifOpen(!wasOpen);
+        if (!wasOpen && hasUnseenNotifications) {
+            const unseenIds = notifications.filter(n => !n.seen).map(n => n.id);
+            setTimeout(() => db.markNotificationsAsSeen(unseenIds), 2000);
+        }
+    };
+    
+    const handleAcceptInvite = async (notificationId: string, tournamentId: string) => {
+        if (!user) return;
+        await db.acceptTournamentInvite(notificationId, user.id, tournamentId);
+        // Notification listener will update the list automatically
+    };
+
+    const handleDeclineInvite = async (notificationId: string, tournamentId: string) => {
+        if (!user) return;
+        await db.declineTournamentInvite(notificationId, user.id, tournamentId);
+        // Notification listener will update the list automatically
+    };
+
+    const NavItem: React.FC<{ to: string, children: React.ReactNode }> = ({ to, children }) => (
+        <NavLink to={to} onClick={() => setIsMenuOpen(false)} className={({ isActive }) => `px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? 'text-white bg-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-white hover:bg-[var(--background-light)]'}`}>
+            {children}
+        </NavLink>
+    );
 
     return (
-        <header className="bg-[var(--background-medium)] border-b border-[var(--border-color)] sticky top-0 z-50 shadow-lg shadow-black/20">
-            <nav className="container mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-between h-16">
+        <header className="bg-[var(--background-medium)]/80 backdrop-blur-sm border-b border-[var(--border-color)] sticky top-0 z-10">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+                <div className="flex items-center justify-between py-6">
                     <div className="flex items-center">
-                        <Link to="/" className="flex-shrink-0 flex items-center space-x-2">
-                           <img 
-                                src={LOGO_URL_PLACEHOLDER}
-                                alt="BoxBox Logo"
-                                className="h-10 w-auto"
-                            />
+                        <Link to="/" className="flex-shrink-0" aria-label="BoxBox Home">
+                           <AppLogo />
                         </Link>
-                        <div className="hidden md:block">
-                            <div className="ml-10 flex items-baseline space-x-4">
-                                <NavLink to="/" className={({isActive}) => `${linkClasses} ${isActive ? activeLinkClass : inactiveLinkClass}`}>Inicio</NavLink>
-                                {nextGp && <NavLink to={`/predict/${nextGp.id}`} className={({isActive}) => `${linkClasses} ${isActive ? activeLinkClass : inactiveLinkClass}`}>Predecir</NavLink>}
-                                <NavLink to="/tournaments" className={({isActive}) => `${linkClasses} ${isActive ? activeLinkClass : inactiveLinkClass}`}>Torneos</NavLink>
-                                <NavLink to="/how-to-play" className={({isActive}) => `${linkClasses} ${isActive ? activeLinkClass : inactiveLinkClass}`}>¿Cómo Jugar?</NavLink>
+                        <nav className="hidden md:block ml-10">
+                            <div className="flex items-baseline space-x-4">
+                                <NavItem to="/">Inicio</NavItem>
+                                {isAuthenticated && <NavItem to="/tournaments">Torneos</NavItem>}
+                                <NavItem to="/how-to-play">Cómo Jugar</NavItem>
+                                {user?.role === 'admin' && <NavItem to="/admin">Admin</NavItem>}
                             </div>
-                        </div>
+                        </nav>
                     </div>
-                    <div className="hidden md:flex items-center space-x-4">
+                    <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                            <Link to="/search" className="p-1 rounded-full text-[var(--text-secondary)] hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white">
+                                <span className="sr-only">Buscar</span>
+                                <SearchIcon className="h-6 w-6" />
+                            </Link>
+                        </div>
                         {isAuthenticated && user ? (
                             <>
-                                <Link to="/search" className={inactiveLinkClass + " p-2 rounded-full"}><SearchIcon /></Link>
-                                <div className="relative" ref={notificationsRef}>
-                                    <button onClick={handleToggleNotifications} className={inactiveLinkClass + " p-2 rounded-full relative"}>
-                                        <BellIcon />
-                                        {hasUnseenNotifications && <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-[var(--accent-red)] ring-2 ring-[var(--background-medium)]" />}
+                                <div ref={notifRef} className="ml-3 relative">
+                                    <button onClick={toggleNotifications} className="p-1 rounded-full text-[var(--text-secondary)] hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white">
+                                        <span className="sr-only">Ver notificaciones</span>
+                                        <BellIcon className="h-6 w-6" />
+                                        {hasUnseenNotifications && (
+                                            <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-[var(--accent-blue)] ring-2 ring-[var(--background-medium)]"></span>
+                                        )}
                                     </button>
-                                     {isNotificationsOpen && (
-                                        <div className="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg bg-[var(--background-medium)] ring-1 ring-[var(--border-color)] ring-opacity-5 focus:outline-none">
-                                            <div className="py-1">
-                                                <h3 className="px-3 py-2 text-sm font-semibold text-white border-b border-[var(--border-color)]">Notificaciones</h3>
-                                                 {notifications.length > 0 ? (
-                                                    <ul className="max-h-96 overflow-y-auto">
-                                                        {notifications.map(n => <NotificationItem key={n.id} notif={n} users={notificationUsers} onAction={handleNotificationAction} />)}
-                                                    </ul>
-                                                ) : (
-                                                    <p className="p-4 text-sm text-gray-500">No tienes notificaciones.</p>
-                                                )}
-                                            </div>
+                                    {isNotifOpen && <NotificationDropdown notifications={notifications} users={usersForNotifs} onAccept={handleAcceptInvite} onDecline={handleDeclineInvite} />}
+                                </div>
+                                <div ref={menuRef} className="ml-3 relative">
+                                    <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white">
+                                        <span className="sr-only">Abrir menú de usuario</span>
+                                        <Avatar avatar={user.avatar} className="w-8 h-8"/>
+                                    </button>
+                                    {isMenuOpen && (
+                                        <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-[var(--background-medium)] ring-1 ring-black ring-opacity-5 focus:outline-none border border-[var(--border-color)]">
+                                            <Link to={`/profile/${user.id}`} onClick={() => setIsMenuOpen(false)} className="block px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--background-light)] hover:text-white w-full text-left">Mi Perfil</Link>
+                                            <button onClick={handleLogout} className="block px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--background-light)] hover:text-white w-full text-left">Cerrar Sesión</button>
                                         </div>
                                     )}
                                 </div>
-                                <Link to={`/profile/${user.id}`} className="flex items-center space-x-2 p-1 pr-3 rounded-full hover:bg-[var(--background-light)] transition-colors">
-                                    <Avatar avatar={user.avatar} className="w-8 h-8"/>
-                                    <span className="text-sm font-medium">{user.name}</span>
-                                </Link>
-                                {user.role === 'admin' && <Link to="/admin" className="text-sm font-bold bg-yellow-600 text-black px-3 py-1.5 rounded-md hover:bg-yellow-700 transition-colors">Admin</Link>}
-                                <button onClick={handleLogout} className="text-sm font-medium bg-red-800 px-3 py-1.5 rounded-md hover:bg-red-700 transition-colors">Salir</button>
                             </>
                         ) : (
-                            <>
-                                <Link to="/login" className={`${linkClasses} ${inactiveLinkClass}`}>Iniciar Sesión</Link>
-                                <Link to="/register" className={`${linkClasses} bg-[var(--accent-red)] text-white hover:opacity-90`}>Registrarse</Link>
-                            </>
+                           <div className="hidden md:flex items-center space-x-2 ml-4">
+                                <Link to="/login" className="px-3 py-2 rounded-md text-sm font-medium text-[var(--text-secondary)] hover:text-white hover:bg-[var(--background-light)] transition-colors">Iniciar Sesión</Link>
+                                <Link to="/register" className="px-3 py-2 rounded-md text-sm font-medium text-white bg-[var(--accent-red)] hover:opacity-90 transition-opacity">Registrarse</Link>
+                           </div>
                         )}
-                    </div>
-                    <div className="-mr-2 flex md:hidden">
-                        <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="inline-flex items-center justify-center p-2 rounded-md text-[var(--text-secondary)] hover:text-white hover:bg-[var(--background-light)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white">
-                            {isMenuOpen ? <CloseIcon /> : <MenuIcon />}
-                        </button>
+                         <div className="md:hidden ml-2">
+                            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 rounded-md text-[var(--text-secondary)] hover:text-white hover:bg-[var(--background-light)]">
+                                {isMenuOpen ? <CloseIcon className="h-6 w-6"/> : <MenuIcon className="h-6 w-6"/>}
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </nav>
+            </div>
 
-             {isMenuOpen && (
-                <div className="md:hidden">
+            {/* Mobile Menu */}
+            {isMenuOpen && (
+                <div className="md:hidden" id="mobile-menu">
                     <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-                        <NavLink to="/" onClick={()=>setIsMenuOpen(false)} className={({isActive}) => `${linkClasses} block ${isActive ? activeLinkClass : inactiveLinkClass}`}>Inicio</NavLink>
-                         {nextGp && <NavLink to={`/predict/${nextGp.id}`} onClick={()=>setIsMenuOpen(false)} className={({isActive}) => `${linkClasses} block ${isActive ? activeLinkClass : inactiveLinkClass}`}>Predecir</NavLink>}
-                        <NavLink to="/tournaments" onClick={()=>setIsMenuOpen(false)} className={({isActive}) => `${linkClasses} block ${isActive ? activeLinkClass : inactiveLinkClass}`}>Torneos</NavLink>
-                        <NavLink to="/how-to-play" onClick={()=>setIsMenuOpen(false)} className={({isActive}) => `${linkClasses} block ${isActive ? activeLinkClass : inactiveLinkClass}`}>¿Cómo Jugar?</NavLink>
-                        <NavLink to="/search" onClick={()=>setIsMenuOpen(false)} className={({isActive}) => `${linkClasses} block ${isActive ? activeLinkClass : inactiveLinkClass}`}>Buscar</NavLink>
-                    </div>
-                    <div className="pt-4 pb-3 border-t border-[var(--border-color)]">
-                        {isAuthenticated && user ? (
-                            <div className="px-5">
-                                <div className="flex items-center space-x-3 mb-3">
-                                    <Avatar avatar={user.avatar} className="w-10 h-10"/>
-                                    <div>
-                                        <div className="text-base font-medium leading-none text-white">{user.name}</div>
-                                        <div className="text-sm font-medium leading-none text-gray-400">{user.email}</div>
-                                    </div>
-                                    <div className="relative ml-auto" ref={notificationsRef}>
-                                        <button onClick={handleToggleNotifications} className="p-2 rounded-full text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white">
-                                           <BellIcon />
-                                           {hasUnseenNotifications && <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-[var(--accent-red)] ring-2 ring-gray-800" />}
-                                        </button>
-                                        {isNotificationsOpen && (
-                                           <div className="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg bg-[var(--background-medium)] ring-1 ring-[var(--border-color)] ring-opacity-5 focus:outline-none">
-                                                <h3 className="px-3 py-2 text-sm font-semibold text-white border-b border-[var(--border-color)]">Notificaciones</h3>
-                                                 {notifications.length > 0 ? (
-                                                    <ul className="max-h-96 overflow-y-auto">
-                                                        {notifications.map(n => <NotificationItem key={n.id} notif={n} users={notificationUsers} onAction={handleNotificationAction} />)}
-                                                    </ul>
-                                                ) : (
-                                                    <p className="p-4 text-sm text-gray-500">No tienes notificaciones.</p>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="mt-3 space-y-1">
-                                    <Link to={`/profile/${user.id}`} onClick={()=>setIsMenuOpen(false)} className={`${linkClasses} block`}>Mi Perfil</Link>
-                                    {user.role === 'admin' && <Link to="/admin" onClick={()=>setIsMenuOpen(false)} className={`${linkClasses} block bg-yellow-600/20 text-yellow-300`}>Admin Panel</Link>}
-                                    <button onClick={()=>{handleLogout(); setIsMenuOpen(false);}} className={`${linkClasses} block w-full text-left`}>Salir</button>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="px-2 space-y-1">
-                                 <Link to="/login" onClick={()=>setIsMenuOpen(false)} className={`${linkClasses} block`}>Iniciar Sesión</Link>
-                                 <Link to="/register" onClick={()=>setIsMenuOpen(false)} className={`${linkClasses} block bg-[var(--accent-red)] text-white hover:opacity-90`}>Registrarse</Link>
-                            </div>
+                        <NavItem to="/">Inicio</NavItem>
+                        {isAuthenticated && <NavItem to="/tournaments">Torneos</NavItem>}
+                        <NavItem to="/how-to-play">Cómo Jugar</NavItem>
+                        {user?.role === 'admin' && <NavItem to="/admin">Admin</NavItem>}
+                        {!isAuthenticated && (
+                            <>
+                                <NavItem to="/login">Iniciar Sesión</NavItem>
+                                <NavItem to="/register">Registrarse</NavItem>
+                            </>
                         )}
                     </div>
                 </div>
