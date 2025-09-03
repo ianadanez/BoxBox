@@ -41,32 +41,47 @@ const NotificationDropdown: React.FC<{ notifications: Notification[], users: Use
 
     const renderNotificationContent = (n: Notification) => {
         const fromUser = getUser('fromUserId' in n ? n.fromUserId : '');
-        switch (n.type) {
-            case 'poke':
-                return <p><span className="font-bold">{fromUser?.name || 'Alguien'}</span> te ha dado un toque 👋.</p>;
-            case 'results':
-                return <p>Ya están los resultados del <span className="font-bold">{n.gpName}</span>.</p>;
-            case 'points_adjustment':
-                const admin = getUser(n.adminId);
-                const verb = n.points > 0 ? 'añadido' : 'quitado';
-                return <p><span className="font-bold">{admin?.name || 'Un admin'}</span> te ha {verb} <span className="font-bold">{Math.abs(n.points)}</span> puntos. Motivo: {n.reason}</p>;
-            case 'tournament_invite':
-                return (
-                    <div>
-                        <p><span className="font-bold">{fromUser?.name || 'Alguien'}</span> te ha invitado al torneo <span className="font-bold">{n.tournamentName}</span>.</p>
-                        <div className="flex space-x-2 mt-2">
-                            <button onClick={(e) => { e.stopPropagation(); onAccept(n.id, n.tournamentId); }} className="text-xs bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded-md">Aceptar</button>
-                            <button onClick={(e) => { e.stopPropagation(); onDecline(n.id, n.tournamentId); }} className="text-xs bg-red-800 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md">Rechazar</button>
-                        </div>
-                    </div>
-                );
-            case 'tournament_invite_accepted':
-                 return <p><span className="font-bold">{fromUser?.name || 'Alguien'}</span> ha aceptado tu invitación a <span className="font-bold">{n.tournamentName}</span>.</p>;
-            case 'tournament_invite_declined':
-                return <p><span className="font-bold">{fromUser?.name || 'Alguien'}</span> ha rechazado tu invitación a <span className="font-bold">{n.tournamentName}</span>.</p>;
-            default:
-                return <p>Tienes una nueva notificación.</p>;
-        }
+        
+        const getNotificationDetails = (): { emoji: string; content: React.ReactNode } => {
+            switch (n.type) {
+                case 'poke':
+                    return { emoji: '👋', content: <><span className="font-bold">{fromUser?.name || 'Alguien'}</span> te ha dado un toque.</> };
+                case 'results':
+                    return { emoji: '🏁', content: <>Ya están los resultados del <span className="font-bold">{n.gpName}</span>.</> };
+                case 'points_adjustment':
+                    const admin = getUser(n.adminId);
+                    const verb = n.points > 0 ? 'añadido' : 'quitado';
+                    return { emoji: '📊', content: <><span className="font-bold">{admin?.name || 'Un admin'}</span> te ha {verb} <span className="font-bold">{Math.abs(n.points)}</span> puntos. Motivo: {n.reason}</> };
+                case 'tournament_invite':
+                    return {
+                        emoji: '🏆',
+                        content: (
+                            <div>
+                                <p><span className="font-bold">{fromUser?.name || 'Alguien'}</span> te ha invitado al torneo <span className="font-bold">{n.tournamentName}</span>.</p>
+                                <div className="flex space-x-2 mt-2">
+                                    <button onClick={(e) => { e.stopPropagation(); onAccept(n.id, n.tournamentId); }} className="text-xs bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded-md">Aceptar</button>
+                                    <button onClick={(e) => { e.stopPropagation(); onDecline(n.id, n.tournamentId); }} className="text-xs bg-red-800 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md">Rechazar</button>
+                                </div>
+                            </div>
+                        )
+                    };
+                case 'tournament_invite_accepted':
+                     return { emoji: '✅', content: <><span className="font-bold">{fromUser?.name || 'Alguien'}</span> ha aceptado tu invitación a <span className="font-bold">{n.tournamentName}</span>.</> };
+                case 'tournament_invite_declined':
+                    return { emoji: '❌', content: <><span className="font-bold">{fromUser?.name || 'Alguien'}</span> ha rechazado tu invitación a <span className="font-bold">{n.tournamentName}</span>.</> };
+                default:
+                    return { emoji: '🔔', content: <>Tienes una nueva notificación.</> };
+            }
+        };
+
+        const { emoji, content } = getNotificationDetails();
+        
+        return (
+            <div className="flex items-start space-x-3">
+                <span className="text-xl mt-0.5">{emoji}</span>
+                <div className="flex-1">{content}</div>
+            </div>
+        );
     };
 
     return (
@@ -79,7 +94,7 @@ const NotificationDropdown: React.FC<{ notifications: Notification[], users: Use
                     {notifications.map(n => (
                         <li key={n.id} className={`p-3 text-sm border-b border-[var(--border-color)] hover:bg-[var(--background-light)] transition-colors ${!n.seen ? 'bg-blue-900/20' : ''}`}>
                             {renderNotificationContent(n)}
-                            <p className="text-xs text-gray-500 mt-1">{new Date(n.timestamp).toLocaleString()}</p>
+                            <p className="text-xs text-gray-500 mt-1 text-right">{new Date(n.timestamp).toLocaleString()}</p>
                         </li>
                     ))}
                 </ul>
@@ -205,9 +220,10 @@ const Header: React.FC = () => {
                                     {isNotifOpen && <NotificationDropdown notifications={notifications} users={usersForNotifs} onAccept={handleAcceptInvite} onDecline={handleDeclineInvite} />}
                                 </div>
                                 <div ref={menuRef} className="ml-3 relative">
-                                    <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white">
+                                    <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="group flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white p-1 hover:bg-[var(--background-light)] transition-colors">
                                         <span className="sr-only">Abrir menú de usuario</span>
                                         <Avatar avatar={user.avatar} className="w-8 h-8"/>
+                                        <span className="hidden md:inline-block ml-2 mr-1 text-sm font-medium text-[var(--text-secondary)] group-hover:text-white transition-colors">{user.name}</span>
                                     </button>
                                     {isMenuOpen && (
                                         <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-[var(--background-medium)] ring-1 ring-black ring-opacity-5 focus:outline-none border border-[var(--border-color)]">

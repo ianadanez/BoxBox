@@ -7,6 +7,20 @@ interface AvatarProps {
   className?: string;
 }
 
+const hexToRgba = (hex: string, opacity: number): string => {
+  let c: any;
+  if (/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)) {
+    c = hex.substring(1).split('');
+    if (c.length === 3) {
+      c = [c[0], c[0], c[1], c[1], c[2], c[2]];
+    }
+    c = `0x${c.join('')}`;
+    return `rgba(${(c >> 16) & 255},${(c >> 8) & 255},${c & 255},${opacity})`;
+  }
+  return hex; // Fallback for non-hex colors
+};
+
+
 const Avatar: React.FC<AvatarProps> = ({ avatar, className = 'w-12 h-12' }) => {
   // Generate a unique ID for this avatar instance to avoid conflicts in SVG defs.
   const uniqueId = useId();
@@ -61,7 +75,7 @@ const Avatar: React.FC<AvatarProps> = ({ avatar, className = 'w-12 h-12' }) => {
     pitstop: <><circle cx="12" cy="14" r="2" fill={accentRed} /><circle cx="20" cy="14" r="2" fill="#52E252" /></>,
     determined: <><path d="M10 13.5 L14 12.5" stroke={eyeColor} strokeWidth="1.5" strokeLinecap="round" /><path d="M22 13.5 L18 12.5" stroke={eyeColor} strokeWidth="1.5" strokeLinecap="round" /><circle cx="12" cy="15" r="1" fill={eyeColor} /><circle cx="20" cy="15" r="1" fill={eyeColor} /></>,
     star: <><path d="M12,12.5 l1.18,2.39 -2.27,-1.48 h2.8 l-2.27,1.48 z" fill={accentBlue} /><path d="M20,12.5 l1.18,2.39 -2.27,-1.48 h2.8 l-2.27,1.48 z" fill={accentBlue} /></>,
-    goggles: <><rect x="8" y="12" width="16" height="5" fill="#111" opacity="0.8" rx="2" /><path d="M9,14.5 h5" stroke={accentBlue} strokeWidth="2" strokeLinecap="round" opacity="0.6" /></>,
+    goggles: <><rect x="8" y="12" width="16" height="5" fill="rgba(17,17,17,0.8)" rx="2" /><path d="M9,14.5 h5" stroke="rgba(0, 210, 255, 0.6)" strokeWidth="2" strokeLinecap="round" /></>,
   };
   
   const helmetWithVisorHolePath = "M16,2 C7.16,2 2,7.16 2,16 L2,22 C2,26.42 5.58,30 10,30 L22,30 C26.42,30 30,26.42 30,22 L30,16 C30,7.16 24.84,2 16,2 Z M8,15 C8,13 24,13 24,15 L24,22 C24,24 8,24 8,22 Z";
@@ -81,19 +95,19 @@ const Avatar: React.FC<AvatarProps> = ({ avatar, className = 'w-12 h-12' }) => {
         
             {/* Helmet patterns with direct color injection and unique IDs */}
             <pattern id={p_halftone_id} patternUnits="userSpaceOnUse" width="6" height="6">
-                <circle cx="3" cy="3" r="1.3" fill={secondaryColor} opacity="0.8"/>
+                <circle cx="3" cy="3" r="1.3" fill={hexToRgba(secondaryColor, 0.8)}/>
             </pattern>
             <pattern id={p_checkers_id} patternUnits="userSpaceOnUse" width="10" height="10">
-                <rect width="5" height="5" fill={secondaryColor} opacity="0.7" />
-                <rect x="5" y="5" width="5" height="5" fill={secondaryColor} opacity="0.7" />
+                <rect width="5" height="5" fill={hexToRgba(secondaryColor, 0.7)} />
+                <rect x="5" y="5" width="5" height="5" fill={hexToRgba(secondaryColor, 0.7)} />
             </pattern>
             <pattern id={p_flames_id} patternUnits="userSpaceOnUse" width="32" height="20" >
-                <path d="M-5 20 Q 5 10, 10 0 Q 15 10, 25 20" fill={secondaryColor} opacity="0.7"/>
-                <path d="M15 20 Q 25 10, 30 0 Q 35 10, 45 20" fill={secondaryColor} opacity="0.7"/>
+                <path d="M-5 20 Q 5 10, 10 0 Q 15 10, 25 20" fill={hexToRgba(secondaryColor, 0.7)}/>
+                <path d="M15 20 Q 25 10, 30 0 Q 35 10, 45 20" fill={hexToRgba(secondaryColor, 0.7)}/>
             </pattern>
             <pattern id={p_carbon_id} patternUnits="userSpaceOnUse" width="6" height="6">
-                <path d="M 0 0 L 6 6 M -1.5 1.5 L 1.5 4.5 M 4.5 -1.5 L 7.5 1.5" stroke={secondaryColor} strokeWidth="1" opacity="0.4"/>
-                <path d="M 6 0 L 0 6 M 4.5 7.5 L 7.5 4.5 M -1.5 4.5 L 1.5 7.5" stroke={secondaryColor} strokeWidth="1" opacity="0.4"/>
+                <path d="M 0 0 L 6 6 M -1.5 1.5 L 1.5 4.5 M 4.5 -1.5 L 7.5 1.5" stroke={hexToRgba(secondaryColor, 0.4)} strokeWidth="1"/>
+                <path d="M 6 0 L 0 6 M 4.5 7.5 L 7.5 4.5 M -1.5 4.5 L 1.5 7.5" stroke={hexToRgba(secondaryColor, 0.4)} strokeWidth="1"/>
             </pattern>
             
             <clipPath id={avatar_clip_id}>
