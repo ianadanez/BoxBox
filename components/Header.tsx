@@ -35,7 +35,16 @@ const AppLogo = () => (
 );
 
 
-const NotificationDropdown: React.FC<{ notifications: Notification[], users: User[], onAccept: (notifId: string, tournamentId: string) => void, onDecline: (notifId: string, tournamentId: string) => void }> = ({ notifications, users, onAccept, onDecline }) => {
+interface NotificationDropdownProps {
+    notifications: Notification[];
+    users: User[];
+    onAccept: (notifId: string, tournamentId: string) => void;
+    onDecline: (notifId: string, tournamentId: string) => void;
+    onClose: () => void;
+    currentUser: User;
+}
+
+const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ notifications, users, onAccept, onDecline, onClose, currentUser }) => {
     
     const getUser = (id: string): User | undefined => users.find(u => u.id === id);
 
@@ -83,6 +92,23 @@ const NotificationDropdown: React.FC<{ notifications: Notification[], users: Use
             </div>
         );
     };
+    
+    const getLinkForNotification = (n: Notification): string | null => {
+        if (!currentUser) return null;
+        switch (n.type) {
+            case 'poke':
+                return `/profile/${n.fromUserId}`;
+            case 'results':
+                return `/results/${currentUser.id}`;
+            case 'points_adjustment':
+                return `/profile/${currentUser.id}`;
+            case 'tournament_invite_accepted':
+            case 'tournament_invite_declined':
+                 return `/tournaments`;
+            default:
+                return null;
+        }
+    };
 
     return (
         <div className="absolute right-0 mt-2 w-80 bg-[var(--background-medium)] rounded-lg shadow-2xl shadow-black/50 border border-[var(--border-color)] overflow-hidden z-20">
@@ -91,12 +117,31 @@ const NotificationDropdown: React.FC<{ notifications: Notification[], users: Use
             </div>
             {notifications.length > 0 ? (
                 <ul className="max-h-96 overflow-y-auto">
-                    {notifications.map(n => (
-                        <li key={n.id} className={`p-3 text-sm border-b border-[var(--border-color)] hover:bg-[var(--background-light)] transition-colors ${!n.seen ? 'bg-blue-900/20' : ''}`}>
-                            {renderNotificationContent(n)}
-                            <p className="text-xs text-gray-500 mt-1 text-right">{new Date(n.timestamp).toLocaleString()}</p>
-                        </li>
-                    ))}
+                    {notifications.map(n => {
+                        const link = getLinkForNotification(n);
+                        const content = (
+                            <>
+                                {renderNotificationContent(n)}
+                                <p className="text-xs text-gray-500 mt-1 text-right">{new Date(n.timestamp).toLocaleString()}</p>
+                            </>
+                        );
+
+                        if (link) {
+                            return (
+                                <li key={n.id} className={`border-b border-[var(--border-color)] ${!n.seen ? 'bg-blue-900/20' : ''}`}>
+                                    <Link to={link} onClick={onClose} className="block p-3 text-sm hover:bg-[var(--background-light)] transition-colors">
+                                        {content}
+                                    </Link>
+                                </li>
+                            );
+                        }
+                        
+                        return (
+                            <li key={n.id} className={`p-3 text-sm border-b border-[var(--border-color)] ${!n.seen ? 'bg-blue-900/20' : ''}`}>
+                                {content}
+                            </li>
+                        );
+                    })}
                 </ul>
             ) : (
                 <p className="p-4 text-sm text-[var(--text-secondary)] text-center">No tienes notificaciones nuevas.</p>
@@ -233,7 +278,7 @@ const Header: React.FC = () => {
                                             <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-[var(--accent-blue)] ring-2 ring-[var(--background-medium)]"></span>
                                         )}
                                     </button>
-                                    {isNotifOpen && <NotificationDropdown notifications={notifications} users={usersForNotifs} onAccept={handleAcceptInvite} onDecline={handleDeclineInvite} />}
+                                    {isNotifOpen && user && <NotificationDropdown notifications={notifications} users={usersForNotifs} onAccept={handleAcceptInvite} onDecline={handleDeclineInvite} onClose={() => setIsNotifOpen(false)} currentUser={user} />}
                                 </div>
                                 <div ref={profileMenuRef} className="ml-3 relative">
                                     <button onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)} className="hidden md:flex group items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white p-1 hover:bg-[var(--background-light)] transition-colors">
