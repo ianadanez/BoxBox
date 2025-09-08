@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Avatar from './common/Avatar';
-import { User, Notification, PokeNotification, ResultsNotification, PointsAdjustmentNotification, TournamentInviteNotification, TournamentInviteAcceptedNotification, TournamentInviteDeclinedNotification, GrandPrix } from '../types';
+import { User, Notification } from '../types';
 import { db } from '../services/db';
 
 const SearchIcon: React.FC<{className?: string}> = ({className}) => (
@@ -109,12 +109,16 @@ const NotificationDropdown: React.FC<{ notifications: Notification[], users: Use
 const Header: React.FC = () => {
     const { user, logout, isAuthenticated } = useAuth();
     const navigate = useNavigate();
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [usersForNotifs, setUsersForNotifs] = useState<User[]>([]);
+
     const notifRef = useRef<HTMLDivElement>(null);
-    const menuRef = useRef<HTMLDivElement>(null);
+    const profileMenuRef = useRef<HTMLDivElement>(null);
+    const mobileMenuRef = useRef<HTMLDivElement>(null);
+    const hamburgerRef = useRef<HTMLButtonElement>(null);
 
     const hasUnseenNotifications = notifications.some(n => !n.seen);
 
@@ -143,8 +147,14 @@ const Header: React.FC = () => {
             if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
                 setIsNotifOpen(false);
             }
-             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-                setIsMenuOpen(false);
+             if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+                setIsProfileMenuOpen(false);
+            }
+            if (
+                hamburgerRef.current && !hamburgerRef.current.contains(event.target as Node) &&
+                mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)
+            ) {
+                setIsMobileMenuOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -153,6 +163,8 @@ const Header: React.FC = () => {
 
     const handleLogout = async () => {
         await logout();
+        setIsMobileMenuOpen(false);
+        setIsProfileMenuOpen(false);
         navigate('/');
     };
 
@@ -168,17 +180,21 @@ const Header: React.FC = () => {
     const handleAcceptInvite = async (notificationId: string, tournamentId: string) => {
         if (!user) return;
         await db.acceptTournamentInvite(notificationId, user.id, tournamentId);
-        // Notification listener will update the list automatically
     };
 
     const handleDeclineInvite = async (notificationId: string, tournamentId: string) => {
         if (!user) return;
         await db.declineTournamentInvite(notificationId, user.id, tournamentId);
-        // Notification listener will update the list automatically
     };
 
     const NavItem: React.FC<{ to: string, children: React.ReactNode }> = ({ to, children }) => (
-        <NavLink to={to} onClick={() => setIsMenuOpen(false)} className={({ isActive }) => `px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? 'text-white bg-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-white hover:bg-[var(--background-light)]'}`}>
+        <NavLink to={to} onClick={() => setIsProfileMenuOpen(false)} className={({ isActive }) => `px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? 'text-white bg-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-white hover:bg-[var(--background-light)]'}`}>
+            {children}
+        </NavLink>
+    );
+
+    const MobileNavItem: React.FC<{ to: string, children: React.ReactNode }> = ({ to, children }) => (
+        <NavLink to={to} onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `block px-3 py-2 rounded-md text-base font-medium ${isActive ? 'text-white bg-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-white hover:bg-[var(--background-light)]'}`}>
             {children}
         </NavLink>
     );
@@ -186,7 +202,7 @@ const Header: React.FC = () => {
     return (
         <header className="bg-[var(--background-medium)]/80 backdrop-blur-sm border-b border-[var(--border-color)] sticky top-0 z-10">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
-                <div className="flex items-center justify-between py-6">
+                <div className="flex items-center justify-between h-16">
                     <div className="flex items-center">
                         <Link to="/" className="flex-shrink-0" aria-label="BoxBox Home">
                            <AppLogo />
@@ -219,15 +235,15 @@ const Header: React.FC = () => {
                                     </button>
                                     {isNotifOpen && <NotificationDropdown notifications={notifications} users={usersForNotifs} onAccept={handleAcceptInvite} onDecline={handleDeclineInvite} />}
                                 </div>
-                                <div ref={menuRef} className="ml-3 relative">
-                                    <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="group flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white p-1 hover:bg-[var(--background-light)] transition-colors">
+                                <div ref={profileMenuRef} className="ml-3 relative">
+                                    <button onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)} className="hidden md:flex group items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white p-1 hover:bg-[var(--background-light)] transition-colors">
                                         <span className="sr-only">Abrir menú de usuario</span>
                                         <Avatar avatar={user.avatar} className="w-8 h-8"/>
-                                        <span className="hidden md:inline-block ml-2 mr-1 text-sm font-medium text-[var(--text-secondary)] group-hover:text-white transition-colors">{user.name}</span>
+                                        <span className="ml-2 mr-1 text-sm font-medium text-[var(--text-secondary)] group-hover:text-white transition-colors">{user.name}</span>
                                     </button>
-                                    {isMenuOpen && (
+                                    {isProfileMenuOpen && (
                                         <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-[var(--background-medium)] ring-1 ring-black ring-opacity-5 focus:outline-none border border-[var(--border-color)]">
-                                            <Link to={`/profile/${user.id}`} onClick={() => setIsMenuOpen(false)} className="block px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--background-light)] hover:text-white w-full text-left">Mi Perfil</Link>
+                                            <Link to={`/profile/${user.id}`} onClick={() => setIsProfileMenuOpen(false)} className="block px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--background-light)] hover:text-white w-full text-left">Mi Perfil</Link>
                                             <button onClick={handleLogout} className="block px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--background-light)] hover:text-white w-full text-left">Cerrar Sesión</button>
                                         </div>
                                     )}
@@ -239,9 +255,10 @@ const Header: React.FC = () => {
                                 <Link to="/register" className="px-3 py-2 rounded-md text-sm font-medium text-white bg-[var(--accent-red)] hover:opacity-90 transition-opacity">Registrarse</Link>
                            </div>
                         )}
-                         <div className="md:hidden ml-2">
-                            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 rounded-md text-[var(--text-secondary)] hover:text-white hover:bg-[var(--background-light)]">
-                                {isMenuOpen ? <CloseIcon className="h-6 w-6"/> : <MenuIcon className="h-6 w-6"/>}
+                         <div className="md:hidden ml-2 flex items-center">
+                            <button ref={hamburgerRef} onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 rounded-md text-[var(--text-secondary)] hover:text-white hover:bg-[var(--background-light)]">
+                                <span className="sr-only">Abrir menú</span>
+                                {isMobileMenuOpen ? <CloseIcon className="h-6 w-6"/> : <MenuIcon className="h-6 w-6"/>}
                             </button>
                         </div>
                     </div>
@@ -249,19 +266,43 @@ const Header: React.FC = () => {
             </div>
 
             {/* Mobile Menu */}
-            {isMenuOpen && (
-                <div className="md:hidden" id="mobile-menu">
+            {isMobileMenuOpen && (
+                <div ref={mobileMenuRef} className="md:hidden" id="mobile-menu">
                     <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-                        <NavItem to="/">Inicio</NavItem>
-                        {isAuthenticated && <NavItem to="/tournaments">Torneos</NavItem>}
-                        <NavItem to="/how-to-play">Cómo Jugar</NavItem>
-                        {user?.role === 'admin' && <NavItem to="/admin">Admin</NavItem>}
-                        {!isAuthenticated && (
-                            <>
-                                <NavItem to="/login">Iniciar Sesión</NavItem>
-                                <NavItem to="/register">Registrarse</NavItem>
-                            </>
+                        {isAuthenticated && user && (
+                            <div className="pt-2 pb-3 px-2 border-b border-[var(--border-color)]">
+                                <div className="flex items-center space-x-4">
+                                    <Avatar avatar={user.avatar} className="w-10 h-10" />
+                                    <div className="font-medium text-base text-white">{user.name}</div>
+                                </div>
+                                <div className="mt-3 space-y-1">
+                                    <MobileNavItem to={`/profile/${user.id}`}>Mi Perfil</MobileNavItem>
+                                </div>
+                            </div>
                         )}
+
+                        <div className="pt-2">
+                            <MobileNavItem to="/">Inicio</MobileNavItem>
+                            {isAuthenticated && <MobileNavItem to="/tournaments">Torneos</MobileNavItem>}
+                            <MobileNavItem to="/how-to-play">Cómo Jugar</MobileNavItem>
+                            {user?.role === 'admin' && <MobileNavItem to="/admin">Admin</MobileNavItem>}
+                        </div>
+                        
+                        <div className="border-t border-[var(--border-color)] pt-4 mt-4">
+                            {isAuthenticated ? (
+                                <button
+                                    onClick={handleLogout}
+                                    className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-[var(--text-secondary)] hover:text-white hover:bg-[var(--background-light)]"
+                                >
+                                    Cerrar Sesión
+                                </button>
+                            ) : (
+                                <div className="space-y-1">
+                                    <MobileNavItem to="/login">Iniciar Sesión</MobileNavItem>
+                                    <MobileNavItem to="/register">Registrarse</MobileNavItem>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

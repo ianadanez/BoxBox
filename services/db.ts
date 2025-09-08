@@ -1,6 +1,4 @@
 
-
-
 import { User, Team, Driver, GrandPrix, Prediction, OfficialResult, Result, Tournament, Score, SeasonTotal, PointAdjustment, Notification, PokeNotification, TournamentInviteNotification, ResultsNotification, PointsAdjustmentNotification, TournamentInviteAcceptedNotification, TournamentInviteDeclinedNotification, GpScore } from '../types';
 import { TEAMS, DRIVERS, GP_SCHEDULE, SCORING_RULES } from '../constants';
 // FIX: Added firebase compat import for FieldValue operations.
@@ -171,8 +169,8 @@ export const db = {
               toUserId: userId,
               type: 'results',
               gpId: result.gpId,
-              // FIX: Cast gp.name to string to satisfy strict type checking where it could be inferred as 'unknown'.
-              gpName: (gp?.name as string) || `GP ${result.gpId}`,
+              // FIX: Safely access gp.name, providing a fallback if gp is undefined, to prevent type errors.
+              gpName: gp ? gp.name : `GP ${result.gpId}`,
               timestamp: new Date().toISOString(),
               seen: false,
           };
