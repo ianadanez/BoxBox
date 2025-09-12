@@ -214,7 +214,7 @@ const ResultsReviewPage: React.FC = () => {
             <div className="flex items-center space-x-4 mb-2">
                 {profileUser && <Avatar avatar={profileUser.avatar} className="w-12 h-12" />}
                 <div>
-                    <h1 className="text-2xl md:text-3xl font-bold text-white">Análisis de Resultados: {profileUser?.name}</h1>
+                    <h1 className="text-2xl md:text-3xl font-bold text-white">Análisis de Resultados: {profileUser?.username}</h1>
                     <h2 className="text-lg text-gray-400">Fin de semana del {lastGp.name}</h2>
                 </div>
             </div>

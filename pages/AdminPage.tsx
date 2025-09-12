@@ -75,7 +75,7 @@ const UsersManagement: React.FC = () => {
         setSearchQuery(query);
         setSelectedUser(null);
         if(query.length > 0) {
-            setSuggestions(users.filter(u => u.name.toLowerCase().includes(query.toLowerCase())));
+            setSuggestions(users.filter(u => u.username.toLowerCase().includes(query.toLowerCase())));
         } else {
             setSuggestions([]);
         }
@@ -83,7 +83,7 @@ const UsersManagement: React.FC = () => {
 
     const handleSelectUser = (user: User) => {
         setSelectedUser(user);
-        setSearchQuery(user.name);
+        setSearchQuery(user.username);
         setSuggestions([]);
     };
     
@@ -115,7 +115,7 @@ const UsersManagement: React.FC = () => {
         const newRole = userToUpdate.role === 'admin' ? 'user' : 'admin';
         const action = newRole === 'admin' ? 'ascender a administrador' : 'degradar a usuario';
         
-        if (window.confirm(`¿Estás seguro de que quieres ${action} a ${userToUpdate.name}?`)) {
+        if (window.confirm(`¿Estás seguro de que quieres ${action} a ${userToUpdate.username}?`)) {
             setUpdatingRoleId(userToUpdate.id);
             try {
                 await db.saveUser({ ...userToUpdate, role: newRole });
@@ -131,7 +131,7 @@ const UsersManagement: React.FC = () => {
         }
     };
 
-    const getUserName = (userId: string) => users.find(u => u.id === userId)?.name || 'Usuario desconocido';
+    const getUserName = (userId: string) => users.find(u => u.id === userId)?.username || 'Usuario desconocido';
 
     return (
         <div className="space-y-8">
@@ -155,7 +155,7 @@ const UsersManagement: React.FC = () => {
                              {suggestions.length > 0 && (
                                 <ul className="absolute z-10 w-full mt-1 bg-[var(--background-medium)] border border-[var(--border-color)] rounded-md shadow-lg max-h-60 overflow-y-auto">
                                     {suggestions.map(u => (
-                                        <li key={u.id} onClick={() => handleSelectUser(u)} className="p-2 cursor-pointer hover:bg-[var(--background-light)]">{u.name}</li>
+                                        <li key={u.id} onClick={() => handleSelectUser(u)} className="p-2 cursor-pointer hover:bg-[var(--background-light)]">{u.username}</li>
                                     ))}
                                 </ul>
                             )}
@@ -213,7 +213,7 @@ const UsersManagement: React.FC = () => {
                         <table className="w-full text-left">
                             <thead className="bg-[var(--background-light)]">
                                 <tr>
-                                    <th className="p-3">Nombre</th>
+                                    <th className="p-3">Nombre de usuario</th>
                                     <th className="p-3">Email</th>
                                     <th className="p-3">Rol Actual</th>
                                     <th className="p-3 text-right">Acciones</th>
@@ -222,7 +222,7 @@ const UsersManagement: React.FC = () => {
                             <tbody>
                                 {users.map(user => (
                                     <tr key={user.id} className="border-b border-[var(--border-color)] hover:bg-[var(--background-light)]/50">
-                                        <td className="p-3 font-medium">{user.name}</td>
+                                        <td className="p-3 font-medium">{user.username}</td>
                                         <td className="p-3 text-[var(--text-secondary)]">{user.email}</td>
                                         <td className="p-3 capitalize">{user.role}</td>
                                         <td className="p-3 text-right">
@@ -677,7 +677,7 @@ const ResultsManagement: React.FC = () => {
         setEditableResult(prev => ({...prev, [field]: value}));
         const reason = prompt(`Motivo para el cambio manual de "${field}":`);
         if (reason && user) {
-            setManualOverrides(prev => ({...prev, [field]: { user: user.name, reason }}));
+            setManualOverrides(prev => ({...prev, [field]: { user: user.username, reason }}));
         }
     };
     

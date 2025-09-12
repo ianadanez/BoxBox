@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { GrandPrix, OfficialResult, Driver, Team, SeasonTotal } from '../types';
@@ -185,31 +186,29 @@ const HomePage: React.FC = () => {
                                 {data.leaderboard.map((score, index) => (
                                     <tr key={score.userId} className="border-b border-[var(--border-color)]">
                                         <td className="p-3 text-lg font-bold text-center text-[var(--text-secondary)]">{index + 1}</td>
-                                        <td className="p-2">
+                                        <td className="p-2 w-12">
                                             <Link to={`/profile/${score.userId}`}>
                                                 <Avatar avatar={score.userAvatar} className="w-10 h-10" />
                                             </Link>
                                         </td>
                                         <td className="p-2 font-medium">
-                                            <Link to={`/profile/${score.userId}`} className="hover:text-[var(--accent-red)] transition-colors">{score.userName}</Link>
+                                            <Link to={`/profile/${score.userId}`} className="hover:text-[var(--accent-red)] transition-colors">
+                                                {score.userUsername}
+                                            </Link>
                                         </td>
                                         <td className="p-3 text-right font-mono text-lg font-bold text-[var(--accent-blue)]">{score.totalPoints}</td>
-                                        <td className="hidden md:table-cell p-3 text-center font-mono text-[var(--text-secondary)]">{score.details.exactP1}</td>
-                                        <td className="hidden md:table-cell p-3 text-center font-mono text-[var(--text-secondary)]">{score.details.exactPole}</td>
+                                        <td className="hidden md:table-cell p-3 text-center font-mono text-gray-400">{score.details.exactP1}</td>
+                                        <td className="hidden md:table-cell p-3 text-center font-mono text-gray-400">{score.details.exactPole}</td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     </div>
+                     <div className="mt-8">
+                        <GoogleAd slot="3093952327" />
+                    </div>
                 </div>
             </div>
-            
-            {/* AdSense Block */}
-            <div className="mt-8">
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)] text-center mb-4">Publicidad</h2>
-                <GoogleAd slot="7546755783" />
-            </div>
-
         </div>
     );
 };

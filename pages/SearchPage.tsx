@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../services/db';
@@ -30,7 +29,7 @@ const SearchPage: React.FC = () => {
         } else {
             const lowercasedQuery = query.toLowerCase();
             const results = allUsers.filter(user =>
-                user.name.toLowerCase().includes(lowercasedQuery)
+                user.username.toLowerCase().includes(lowercasedQuery)
             );
             setFilteredUsers(results);
         }
@@ -42,7 +41,7 @@ const SearchPage: React.FC = () => {
             <div className="mb-8">
                 <input
                     type="text"
-                    placeholder="Escribe un nombre para buscar..."
+                    placeholder="Escribe un nombre de usuario para buscar..."
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     className="w-full bg-[var(--background-light)] border border-[var(--border-color)] rounded-md p-3 text-lg text-white placeholder-[var(--text-secondary)] focus:ring-2 focus:ring-[var(--accent-red)] focus:border-[var(--accent-red)] transition-colors"
@@ -61,7 +60,7 @@ const SearchPage: React.FC = () => {
                                 className="bg-[var(--background-medium)] p-4 rounded-lg border border-[var(--border-color)] flex flex-col items-center text-center space-y-3 hover:border-[var(--accent-red)] hover:shadow-lg hover:shadow-red-900/20 transition-all duration-300 transform hover:-translate-y-1"
                             >
                                 <Avatar avatar={user.avatar} className="w-24 h-24" />
-                                <span className="font-bold text-lg text-[var(--text-primary)]">{user.name}</span>
+                                <span className="font-bold text-lg text-[var(--text-primary)]">{user.username}</span>
                             </Link>
                         ))
                     ) : (

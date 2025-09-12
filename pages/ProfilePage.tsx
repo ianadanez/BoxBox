@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useParams, Link } from 'react-router-dom';
@@ -16,7 +15,8 @@ const ProfilePage: React.FC = () => {
 
     const [profileUser, setProfileUser] = useState<User | null>(null);
     const [isEditing, setIsEditing] = useState(false);
-    const [displayName, setDisplayName] = useState('');
+    const [username, setUsername] = useState('');
+    const [usernameError, setUsernameError] = useState('');
     const [avatar, setAvatar] = useState<AvatarType | null>(null);
     const [stats, setStats] = useState<SeasonTotal | null>(null);
     const [loading, setLoading] = useState(true);
@@ -42,7 +42,7 @@ const ProfilePage: React.FC = () => {
 
                 if (userToView) {
                     setProfileUser(userToView);
-                    setDisplayName(userToView.name);
+                    setUsername(userToView.username);
                     setAvatar({
                         skinColor: '#C68642', color: '#6CD3BF', secondaryColor: '#FFFFFF',
                         eyes: 'normal', pattern: 'none', ...userToView.avatar,
@@ -101,10 +101,34 @@ const ProfilePage: React.FC = () => {
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!isOwnProfile || !currentUser || !avatar) return;
+
+        const trimmedUsername = username.trim();
+
+        if (!trimmedUsername) {
+            setUsernameError('El nombre de usuario no puede estar vacío.');
+            return;
+        }
+        if (/\s/.test(trimmedUsername)) {
+            setUsernameError('El nombre de usuario no puede contener espacios.');
+            return;
+        }
+        if (trimmedUsername.length < 3) {
+            setUsernameError('El nombre de usuario debe tener al menos 3 caracteres.');
+            return;
+        }
+        setUsernameError('');
+
+        if (trimmedUsername !== currentUser.username) {
+            const existingUser = await db.getUserByUsername(trimmedUsername);
+            if (existingUser && existingUser.id !== currentUser.id) {
+                setUsernameError('Este nombre de usuario ya está en uso.');
+                return;
+            }
+        }
         
         const updatedUser = {
             ...currentUser,
-            name: displayName,
+            username: trimmedUsername,
             avatar: avatar
         };
         await updateUser(updatedUser);
@@ -147,8 +171,9 @@ const ProfilePage: React.FC = () => {
                                 </div>
                             </div>
                             <div>
-                                <label htmlFor="displayName" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Nombre visible</label>
-                                <input id="displayName" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full max-w-md bg-[var(--background-light)] border border-[var(--border-color)] rounded-md p-2.5 text-white focus:ring-2 focus:ring-[var(--accent-red)]" />
+                                <label htmlFor="username" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Nombre de usuario</label>
+                                <input id="username" type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full max-w-md bg-[var(--background-light)] border border-[var(--border-color)] rounded-md p-2.5 text-white focus:ring-2 focus:ring-[var(--accent-red)]" />
+                                {usernameError && <p className="text-sm text-red-400 mt-2">{usernameError}</p>}
                             </div>
                             
                             <AvatarEditor avatar={avatar} onAvatarChange={setAvatar} />
@@ -158,7 +183,7 @@ const ProfilePage: React.FC = () => {
                         <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-8">
                            {avatar && <Avatar avatar={avatar} className="w-40 h-40" />}
                            <div className="flex-grow text-center sm:text-left">
-                               <h2 className="text-4xl font-bold">{profileUser.name}</h2>
+                               <h2 className="text-4xl font-bold">{profileUser.username}</h2>
                                <p className="text-[var(--text-secondary)]">Miembro desde {new Date(profileUser.createdAt).toLocaleDateString()}</p>
                            </div>
                            {isOwnProfile && (

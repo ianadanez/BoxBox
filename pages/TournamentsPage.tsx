@@ -135,7 +135,7 @@ const TournamentsPage: React.FC = () => {
         setInviteSearchQuery(query);
         if (query.length > 1 && selectedTournament) {
             const suggestions = allUsers.filter(u =>
-                u.name.toLowerCase().includes(query.toLowerCase()) &&
+                u.username.toLowerCase().includes(query.toLowerCase()) &&
                 !selectedTournament.memberIds.includes(u.id) &&
                 !selectedTournament.pendingMemberIds?.includes(u.id)
             );
@@ -151,12 +151,12 @@ const TournamentsPage: React.FC = () => {
         const result = await db.sendTournamentInvite(user.id, invitedUser.id, selectedTournament.id, selectedTournament.name);
         
         if (result) {
-            alert(`Se ha enviado una invitación a ${invitedUser.name}.`);
+            alert(`Se ha enviado una invitación a ${invitedUser.username}.`);
             // Optimistically update UI
             setTournamentPendingMembers(prev => [...prev, invitedUser]);
             setSelectedTournament(prev => prev ? ({ ...prev, pendingMemberIds: [...(prev.pendingMemberIds || []), invitedUser.id] }) : null);
         } else {
-            alert(`${invitedUser.name} ya es miembro o tiene una invitación pendiente.`);
+            alert(`${invitedUser.username} ya es miembro o tiene una invitación pendiente.`);
         }
         
         // Remove user from suggestions and clear search
@@ -252,7 +252,7 @@ const TournamentsPage: React.FC = () => {
                                             </td>
                                             <td className="p-2 font-medium">
                                                 <Link to={`/profile/${score.userId}`} className="hover:text-[var(--accent-red)] transition-colors">
-                                                    {score.userName}
+                                                    {score.userUsername}
                                                 </Link>
                                             </td>
                                             <td className="p-3 text-right font-mono text-lg font-bold text-[var(--accent-blue)]">{score.totalPoints}</td>
@@ -279,7 +279,7 @@ const TournamentsPage: React.FC = () => {
                                             <ul className="absolute z-10 w-full mt-1 bg-[var(--background-medium)] border border-[var(--border-color)] rounded-md shadow-lg max-h-60 overflow-y-auto">
                                                 {inviteSuggestions.map(u => (
                                                     <li key={u.id} className="p-2 flex justify-between items-center hover:bg-[var(--background-light)]">
-                                                        <span>{u.name}</span>
+                                                        <span>{u.username}</span>
                                                         <button onClick={() => handleSendInvite(u)} className="text-sm bg-[var(--accent-blue)] text-black font-bold py-1 px-3 rounded-md hover:opacity-80 transition-opacity">Invitar</button>
                                                     </li>
                                                 ))}
@@ -295,7 +295,7 @@ const TournamentsPage: React.FC = () => {
                                         <Link to={`/profile/${member.id}`} className="flex items-center space-x-4 p-2 rounded-lg hover:bg-[var(--background-light)] transition-colors">
                                             <Avatar avatar={member.avatar} className="w-10 h-10 flex-shrink-0" />
                                             <div className="flex-grow">
-                                                <p className="font-bold text-white">{member.name}</p>
+                                                <p className="font-bold text-white">{member.username}</p>
                                                 {member.id === selectedTournament.creatorId && (
                                                     <p className="text-xs text-[var(--accent-blue)]">Creador</p>
                                                 )}
@@ -312,7 +312,7 @@ const TournamentsPage: React.FC = () => {
                                         {tournamentPendingMembers.map(member => (
                                             <li key={member.id} className="flex items-center space-x-4 p-2 rounded-lg bg-[var(--background-light)]/50">
                                                 <Avatar avatar={member.avatar} className="w-10 h-10 flex-shrink-0" />
-                                                <p className="font-bold text-gray-400">{member.name}</p>
+                                                <p className="font-bold text-gray-400">{member.username}</p>
                                             </li>
                                         ))}
                                     </ul>

@@ -54,19 +54,19 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ notificatio
         const getNotificationDetails = (): { emoji: string; content: React.ReactNode } => {
             switch (n.type) {
                 case 'poke':
-                    return { emoji: '👋', content: <><span className="font-bold">{fromUser?.name || 'Alguien'}</span> te ha dado un toque.</> };
+                    return { emoji: '👋', content: <><span className="font-bold">{fromUser?.username || 'Alguien'}</span> te ha dado un toque.</> };
                 case 'results':
                     return { emoji: '🏁', content: <>Ya están los resultados del <span className="font-bold">{n.gpName}</span>.</> };
                 case 'points_adjustment':
                     const admin = getUser(n.adminId);
                     const verb = n.points > 0 ? 'añadido' : 'quitado';
-                    return { emoji: '📊', content: <><span className="font-bold">{admin?.name || 'Un admin'}</span> te ha {verb} <span className="font-bold">{Math.abs(n.points)}</span> puntos. Motivo: {n.reason}</> };
+                    return { emoji: '📊', content: <><span className="font-bold">{admin?.username || 'Un admin'}</span> te ha {verb} <span className="font-bold">{Math.abs(n.points)}</span> puntos. Motivo: {n.reason}</> };
                 case 'tournament_invite':
                     return {
                         emoji: '🏆',
                         content: (
                             <div>
-                                <p><span className="font-bold">{fromUser?.name || 'Alguien'}</span> te ha invitado al torneo <span className="font-bold">{n.tournamentName}</span>.</p>
+                                <p><span className="font-bold">{fromUser?.username || 'Alguien'}</span> te ha invitado al torneo <span className="font-bold">{n.tournamentName}</span>.</p>
                                 <div className="flex space-x-2 mt-2">
                                     <button onClick={(e) => { e.stopPropagation(); onAccept(n.id, n.tournamentId); }} className="text-xs bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded-md">Aceptar</button>
                                     <button onClick={(e) => { e.stopPropagation(); onDecline(n.id, n.tournamentId); }} className="text-xs bg-red-800 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md">Rechazar</button>
@@ -75,9 +75,9 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ notificatio
                         )
                     };
                 case 'tournament_invite_accepted':
-                     return { emoji: '✅', content: <><span className="font-bold">{fromUser?.name || 'Alguien'}</span> ha aceptado tu invitación a <span className="font-bold">{n.tournamentName}</span>.</> };
+                     return { emoji: '✅', content: <><span className="font-bold">{fromUser?.username || 'Alguien'}</span> ha aceptado tu invitación a <span className="font-bold">{n.tournamentName}</span>.</> };
                 case 'tournament_invite_declined':
-                    return { emoji: '❌', content: <><span className="font-bold">{fromUser?.name || 'Alguien'}</span> ha rechazado tu invitación a <span className="font-bold">{n.tournamentName}</span>.</> };
+                    return { emoji: '❌', content: <><span className="font-bold">{fromUser?.username || 'Alguien'}</span> ha rechazado tu invitación a <span className="font-bold">{n.tournamentName}</span>.</> };
                 default:
                     return { emoji: '🔔', content: <>Tienes una nueva notificación.</> };
             }
@@ -284,7 +284,7 @@ const Header: React.FC = () => {
                                     <button onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)} className="hidden md:flex group items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white p-1 hover:bg-[var(--background-light)] transition-colors">
                                         <span className="sr-only">Abrir menú de usuario</span>
                                         <Avatar avatar={user.avatar} className="w-8 h-8"/>
-                                        <span className="ml-2 mr-1 text-sm font-medium text-[var(--text-secondary)] group-hover:text-white transition-colors">{user.name}</span>
+                                        <span className="ml-2 mr-1 text-sm font-medium text-[var(--text-secondary)] group-hover:text-white transition-colors">{user.username}</span>
                                     </button>
                                     {isProfileMenuOpen && (
                                         <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-[var(--background-medium)] ring-1 ring-black ring-opacity-5 focus:outline-none border border-[var(--border-color)]">
@@ -318,7 +318,7 @@ const Header: React.FC = () => {
                             <div className="pt-2 pb-3 px-2 border-b border-[var(--border-color)]">
                                 <div className="flex items-center space-x-4">
                                     <Avatar avatar={user.avatar} className="w-10 h-10" />
-                                    <div className="font-medium text-base text-white">{user.name}</div>
+                                    <div className="font-medium text-base text-white">{user.username}</div>
                                 </div>
                                 <div className="mt-3 space-y-1">
                                     <MobileNavItem to={`/profile/${user.id}`}>Mi Perfil</MobileNavItem>

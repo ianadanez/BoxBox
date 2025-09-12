@@ -17,7 +17,7 @@ const getRandomAvatar = (): AvatarType => ({
 
 
 const RegisterPage: React.FC = () => {
-    const [name, setName] = useState('');
+    const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [favoriteTeamId, setFavoriteTeamId] = useState('');
@@ -25,6 +25,7 @@ const RegisterPage: React.FC = () => {
     const [teams, setTeams] = useState<Team[]>([]);
     
     const [error, setError] = useState('');
+    const [usernameError, setUsernameError] = useState('');
     const [loading, setLoading] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
     const { register } = useAuth();
@@ -41,11 +42,33 @@ const RegisterPage: React.FC = () => {
         fetchTeams();
     }, []);
 
+    const validateUsername = (value: string) => {
+        if (!value) {
+            setUsernameError('El nombre de usuario es requerido.');
+            return false;
+        }
+        if (/\s/.test(value)) {
+            setUsernameError('El nombre de usuario no puede contener espacios.');
+            return false;
+        }
+        if (value.length < 3) {
+            setUsernameError('Debe tener al menos 3 caracteres.');
+            return false;
+        }
+        setUsernameError('');
+        return true;
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        setUsernameError('');
         
-        if (!name || !email || !password || !favoriteTeamId) {
+        if (!validateUsername(username)) {
+            return;
+        }
+
+        if (!email || !password || !favoriteTeamId) {
             setError("Todos los campos son requeridos.");
             return;
         }
@@ -58,11 +81,13 @@ const RegisterPage: React.FC = () => {
         setLoading(true);
 
         try {
-            await register({ name, email, password, favoriteTeamId, avatar });
+            await register({ username, email, password, favoriteTeamId, avatar });
             setIsSuccess(true);
         } catch (err: any) {
             if (err.code === 'auth/email-already-in-use') {
                 setError('Este email ya está registrado. Intenta iniciar sesión.');
+            } else if (err.name === 'auth/username-already-in-use') {
+                setUsernameError('Este nombre de usuario ya está en uso. Por favor, elige otro.');
             } else {
                 setError('Ocurrió un error inesperado durante el registro.');
             }
@@ -97,9 +122,10 @@ const RegisterPage: React.FC = () => {
                 <form onSubmit={handleSubmit} className="space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label htmlFor="name" className="block text-sm font-medium text-[var(--text-secondary)]">Nombre</label>
-                            <input id="name" type="text" autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)}
+                            <label htmlFor="username" className="block text-sm font-medium text-[var(--text-secondary)]">Nombre de usuario</label>
+                            <input id="username" type="text" autoComplete="username" required value={username} onChange={(e) => setUsername(e.target.value)} onBlur={(e) => validateUsername(e.target.value)}
                                 className="mt-1 w-full px-3 py-2 text-white bg-[var(--background-light)] border border-[var(--border-color)] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-red)] focus:border-[var(--accent-red)]" />
+                            {usernameError && <p className="text-xs text-red-400 mt-1">{usernameError}</p>}
                         </div>
                         <div>
                             <label htmlFor="email" className="block text-sm font-medium text-[var(--text-secondary)]">Email</label>

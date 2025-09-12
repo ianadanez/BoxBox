@@ -1,4 +1,5 @@
 
+
 import { User, Team, Driver, GrandPrix, Prediction, OfficialResult, Result, Tournament, Score, SeasonTotal, PointAdjustment, Notification, PokeNotification, TournamentInviteNotification, ResultsNotification, PointsAdjustmentNotification, TournamentInviteAcceptedNotification, TournamentInviteDeclinedNotification, GpScore } from '../types';
 import { TEAMS, DRIVERS, GP_SCHEDULE, SCORING_RULES } from '../constants';
 // FIX: Added firebase compat import for FieldValue operations.
@@ -43,6 +44,12 @@ export const db = {
   getUserByEmail: async (email: string): Promise<User | undefined> => {
       // FIX: Use compat API `where()` and `get()` methods.
       const q = usersCol.where("email", "==", email);
+      const snapshot = await q.get();
+      if (snapshot.empty) return undefined;
+      return snapshot.docs[0].data() as User;
+  },
+  getUserByUsername: async (username: string): Promise<User | undefined> => {
+      const q = usersCol.where("username", "==", username);
       const snapshot = await q.get();
       if (snapshot.empty) return undefined;
       return snapshot.docs[0].data() as User;
@@ -252,7 +259,7 @@ export const db = {
     users.forEach(user => {
         scores[user.id] = {
             userId: user.id,
-            userName: user.name,
+            userUsername: user.username,
             userAvatar: user.avatar,
             totalPoints: 0,
             details: { exactPole: 0, exactP1: 0, exactFastestLap: 0 },

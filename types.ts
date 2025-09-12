@@ -2,7 +2,7 @@
 
 export interface User {
   id: string;
-  name: string;
+  username: string;
   email: string; // Used as a unique identifier for login
   password?: string; // Stored plaintext for local demo. DO NOT USE IN PRODUCTION.
   role: 'user' | 'admin';
@@ -174,14 +174,14 @@ export type ScoreDetail = {
   exactFastestLap: number;
 }
 export interface UserScore extends Score {
-    userName: string;
+    userUsername: string;
     userAvatar: Avatar;
     details: ScoreDetail;
 }
 
 export interface SeasonTotal {
     userId: string;
-    userName: string;
+    userUsername: string;
     userAvatar: Avatar;
     totalPoints: number;
     details: ScoreDetail;

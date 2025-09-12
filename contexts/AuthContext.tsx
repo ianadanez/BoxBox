@@ -5,7 +5,7 @@ import { auth } from '../firebaseConfig';
 // FIX: Removed modular auth imports to use compat API with the compat auth instance.
 
 interface RegisterDetails {
-  name: string;
+  username: string;
   email: string;
   password: string;
   favoriteTeamId: string;
@@ -86,6 +86,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const register = async (details: RegisterDetails): Promise<void> => {
+    // Check for username uniqueness before anything else
+    const existingUserByUsername = await db.getUserByUsername(details.username);
+    if (existingUserByUsername) {
+        const error = new Error("El nombre de usuario ya está en uso.");
+        error.name = 'auth/username-already-in-use';
+        throw error;
+    }
+
     // FIX: Use compat API `createUserWithEmailAndPassword` method directly on the auth instance.
     const userCredential = await auth.createUserWithEmailAndPassword(details.email, details.password);
     const firebaseUser = userCredential.user;
@@ -99,7 +107,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const newUser: User = {
         id: firebaseUser.uid, // Use Firebase UID as the user ID
-        name: details.name,
+        username: details.username,
         email: details.email,
         // Do not store password
         role: 'user',
