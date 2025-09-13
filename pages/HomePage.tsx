@@ -61,7 +61,7 @@ const PodiumCard: React.FC<{ position: number; driverId?: string; drivers: Drive
 };
 
 const HomePage: React.FC = () => {
-    const { loading: authLoading } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     const [data, setData] = useState<{
         lastGp: GrandPrix | null;
         nextGp: GrandPrix | null;
@@ -71,6 +71,9 @@ const HomePage: React.FC = () => {
         teams: Team[];
     }>({ lastGp: null, nextGp: null, lastResult: null, leaderboard: [], drivers: [], teams: [] });
     const [loading, setLoading] = useState(true);
+    const [currentPage, setCurrentPage] = useState(0);
+
+    const USERS_PER_PAGE = 10;
     
     useEffect(() => {
         const fetchData = async () => {
@@ -112,6 +115,25 @@ const HomePage: React.FC = () => {
 
         fetchData();
     }, []);
+
+    const totalPages = Math.ceil(data.leaderboard.length / USERS_PER_PAGE);
+    const paginatedLeaderboard = data.leaderboard.slice(
+        currentPage * USERS_PER_PAGE,
+        (currentPage + 1) * USERS_PER_PAGE
+    );
+
+    const handlePrevPage = () => setCurrentPage(prev => Math.max(0, prev - 1));
+    const handleNextPage = () => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1));
+    
+    const handleGoToMyPosition = () => {
+        if (user) {
+            const userIndex = data.leaderboard.findIndex(s => s.userId === user.id);
+            if (userIndex !== -1) {
+                const userPage = Math.floor(userIndex / USERS_PER_PAGE);
+                setCurrentPage(userPage);
+            }
+        }
+    };
 
     if (authLoading || loading) {
         return <div className="text-center p-8">Cargando...</div>;
@@ -183,9 +205,9 @@ const HomePage: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {data.leaderboard.map((score, index) => (
+                                {paginatedLeaderboard.map((score, index) => (
                                     <tr key={score.userId} className="border-b border-[var(--border-color)]">
-                                        <td className="p-3 text-lg font-bold text-center text-[var(--text-secondary)]">{index + 1}</td>
+                                        <td className="p-3 text-lg font-bold text-center text-[var(--text-secondary)]">{(currentPage * USERS_PER_PAGE) + index + 1}</td>
                                         <td className="p-2 font-medium">
                                             <Link to={`/profile/${score.userId}`} className="flex items-center space-x-3 group">
                                                 <Avatar avatar={score.userAvatar} className="w-10 h-10" />
@@ -199,6 +221,24 @@ const HomePage: React.FC = () => {
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                     <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <div className="flex items-center gap-2">
+                             <button onClick={handlePrevPage} disabled={currentPage === 0} className="px-4 py-2 text-sm font-medium rounded-md bg-[var(--background-light)] hover:bg-[var(--border-color)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                Anterior
+                            </button>
+                            <span className="text-sm text-[var(--text-secondary)]">
+                                Página {currentPage + 1} de {totalPages}
+                            </span>
+                            <button onClick={handleNextPage} disabled={currentPage >= totalPages - 1} className="px-4 py-2 text-sm font-medium rounded-md bg-[var(--background-light)] hover:bg-[var(--border-color)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                Siguiente
+                            </button>
+                        </div>
+                        {user && data.leaderboard.some(s => s.userId === user.id) && (
+                             <button onClick={handleGoToMyPosition} className="px-4 py-2 text-sm font-bold rounded-md bg-[var(--accent-blue)] text-black hover:opacity-80 transition-opacity">
+                                Ver mi posición
+                            </button>
+                        )}
                     </div>
                      <div className="mt-8">
                         <GoogleAd slot="3093952327" />

@@ -161,6 +161,7 @@ const Header: React.FC = () => {
     const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [usersForNotifs, setUsersForNotifs] = useState<User[]>([]);
+    const [nextGpId, setNextGpId] = useState<number | null>(null);
 
     const notifRef = useRef<HTMLDivElement>(null);
     const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -168,6 +169,20 @@ const Header: React.FC = () => {
     const hamburgerRef = useRef<HTMLButtonElement>(null);
 
     const hasUnseenNotifications = notifications.some(n => !n.seen);
+
+    useEffect(() => {
+        const findNextGp = async () => {
+            const schedule = await db.getSchedule();
+            const now = new Date();
+            const upcomingGps = schedule
+                .filter(gp => new Date(gp.events.race) >= now)
+                .sort((a, b) => new Date(a.events.race).getTime() - new Date(b.events.race).getTime());
+            if (upcomingGps.length > 0) {
+                setNextGpId(upcomingGps[0].id);
+            }
+        };
+        findNextGp();
+    }, []);
 
     useEffect(() => {
         let unsubscribe: (() => void) | undefined;
@@ -250,6 +265,7 @@ const Header: React.FC = () => {
                         </Link>
                         <nav className="hidden md:flex space-x-6">
                             <NavLink to="/" className={({ isActive }) => `text-sm font-medium transition-colors ${isActive ? 'text-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-white'}`}>Inicio</NavLink>
+                            <NavLink to={nextGpId ? `/predict/${nextGpId}` : '/'} className={({ isActive }) => `text-sm font-medium transition-colors ${isActive ? 'text-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-white'}`}>Predecir</NavLink>
                             <NavLink to="/tournaments" className={({ isActive }) => `text-sm font-medium transition-colors ${isActive ? 'text-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-white'}`}>Torneos</NavLink>
                             <NavLink to="/how-to-play" className={({ isActive }) => `text-sm font-medium transition-colors ${isActive ? 'text-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-white'}`}>Cómo Jugar</NavLink>
                         </nav>
@@ -318,6 +334,7 @@ const Header: React.FC = () => {
                  <div ref={mobileMenuRef} className="md:hidden bg-[var(--background-medium)] border-b border-[var(--border-color)]">
                     <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
                          <NavLink to="/" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `block px-3 py-2 rounded-md text-base font-medium ${isActive ? 'bg-[var(--accent-red)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--background-light)] hover:text-white'}`}>Inicio</NavLink>
+                         <NavLink to={nextGpId ? `/predict/${nextGpId}` : '/'} onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `block px-3 py-2 rounded-md text-base font-medium ${isActive ? 'bg-[var(--accent-red)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--background-light)] hover:text-white'}`}>Predecir</NavLink>
                          <NavLink to="/tournaments" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `block px-3 py-2 rounded-md text-base font-medium ${isActive ? 'bg-[var(--accent-red)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--background-light)] hover:text-white'}`}>Torneos</NavLink>
                          <NavLink to="/how-to-play" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `block px-3 py-2 rounded-md text-base font-medium ${isActive ? 'bg-[var(--accent-red)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--background-light)] hover:text-white'}`}>Cómo Jugar</NavLink>
                     </div>

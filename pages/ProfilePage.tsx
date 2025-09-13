@@ -24,6 +24,7 @@ const ProfilePage: React.FC = () => {
     const [canPoke, setCanPoke] = useState(false);
     const [pokeCooldown, setPokeCooldown] = useState(false);
     const [gpScores, setGpScores] = useState<GpScore[]>([]);
+    const [showAllResults, setShowAllResults] = useState(false);
 
 
     const isOwnProfile = currentUser?.id === userId;
@@ -178,6 +179,8 @@ const ProfilePage: React.FC = () => {
             </div>
         );
     }
+    
+    const resultsToShow = showAllResults ? gpScores : gpScores.slice(0, 3);
 
     return (
         <div className="container mx-auto p-4 md:p-8 max-w-7xl">
@@ -221,22 +224,37 @@ const ProfilePage: React.FC = () => {
                     <div className="bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)]">
                         <h2 className="text-2xl font-bold f1-red-text mb-4">Resultados de la Temporada</h2>
                         {gpScores.length > 0 ? (
-                            <div className="space-y-4">
-                                {gpScores.map(score => (
-                                    <div key={score.gpId} className="bg-[var(--background-light)] p-4 rounded-lg flex items-center justify-between flex-wrap gap-2">
-                                        <div>
-                                            <p className="font-bold text-lg text-white">{score.gpName}</p>
-                                            <p className="text-sm text-gray-400">Puntos Obtenidos: <span className="font-bold text-[var(--accent-blue)]">{score.totalPoints}</span></p>
+                            <>
+                                <div className="space-y-4">
+                                    {resultsToShow.map(score => (
+                                        <div key={score.gpId} className="bg-[var(--background-light)] p-4 rounded-lg flex items-center justify-between flex-wrap gap-2">
+                                            <div>
+                                                <p className="font-bold text-lg text-white">{score.gpName}</p>
+                                                <p className="text-sm text-gray-400">Puntos Obtenidos: <span className="font-bold text-[var(--accent-blue)]">{score.totalPoints}</span></p>
+                                            </div>
+                                            <Link 
+                                                to={`/results/${profileUser.id}/${score.gpId}`}
+                                                className="bg-[var(--accent-blue)] text-black font-bold py-2 px-4 rounded-md hover:opacity-80 transition-opacity text-sm"
+                                            >
+                                                Ver Desglose
+                                            </Link>
                                         </div>
-                                        <Link 
-                                            to={`/results/${profileUser.id}/${score.gpId}`}
-                                            className="bg-[var(--accent-blue)] text-black font-bold py-2 px-4 rounded-md hover:opacity-80 transition-opacity text-sm"
+                                    ))}
+                                </div>
+                                {gpScores.length > 3 && (
+                                    <div className="mt-6 text-center">
+                                        <button
+                                            onClick={() => setShowAllResults(!showAllResults)}
+                                            className="text-[var(--accent-blue)] font-semibold hover:opacity-80 transition-opacity py-2 px-5 rounded-md flex items-center justify-center mx-auto space-x-2 bg-[var(--background-light)] hover:bg-[var(--border-color)]"
                                         >
-                                            Ver Desglose
-                                        </Link>
+                                            <span>{showAllResults ? 'Mostrar menos' : 'Ver todos'}</span>
+                                            <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 transition-transform ${showAllResults ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                                            </svg>
+                                        </button>
                                     </div>
-                                ))}
-                            </div>
+                                )}
+                            </>
                         ) : (
                             <p className="text-[var(--text-secondary)]">No hay resultados de Grandes Premios para mostrar todavía.</p>
                         )}
