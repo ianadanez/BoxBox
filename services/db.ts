@@ -23,13 +23,28 @@ const pointAdjustmentsCol = firestore.collection('pointAdjustments');
 const notificationsCol = firestore.collection('notifications');
 
 
+// Helper function to provide a fallback for the username property.
+// This ensures backward compatibility for users created before the 'name' -> 'username' migration.
+const applyUsernameFallback = (user: User): User => {
+    const userWithPotentialName = user as any;
+    // If username doesn't exist, try to use 'name'.
+    if (!user.username && userWithPotentialName.name) {
+        return { ...user, username: userWithPotentialName.name };
+    }
+    // If neither exists, fall back to the email prefix.
+    if (!user.username && !userWithPotentialName.name) {
+        return { ...user, username: user.email.split('@')[0] };
+    }
+    return user;
+};
+
+
 // --- Firestore DB Service Implementation ---
 export const db = {
   // Users
   getUsers: async (): Promise<User[]> => {
-      // FIX: Use compat API `get()` method.
       const snapshot = await usersCol.get();
-      return snapshot.docs.map(doc => doc.data() as User);
+      return snapshot.docs.map(doc => applyUsernameFallback(doc.data() as User));
   },
   getUsersByIds: async (ids: string[]): Promise<User[]> => {
       if (ids.length === 0) {
@@ -39,14 +54,14 @@ export const db = {
       // For notifications, this is a safe assumption. For larger queries, chunking would be needed.
       const q = usersCol.where(firebase.firestore.FieldPath.documentId(), 'in', ids);
       const snapshot = await q.get();
-      return snapshot.docs.map(doc => doc.data() as User);
+      return snapshot.docs.map(doc => applyUsernameFallback(doc.data() as User));
   },
   getUserByEmail: async (email: string): Promise<User | undefined> => {
       // FIX: Use compat API `where()` and `get()` methods.
       const q = usersCol.where("email", "==", email);
       const snapshot = await q.get();
       if (snapshot.empty) return undefined;
-      return snapshot.docs[0].data() as User;
+      return applyUsernameFallback(snapshot.docs[0].data() as User);
   },
   getUserByUsername: async (username: string): Promise<User | undefined> => {
       const q = usersCol.where("username", "==", username);
@@ -58,7 +73,8 @@ export const db = {
       // FIX: Use compat API `doc()` and `get()` methods.
       const docRef = usersCol.doc(id);
       const docSnap = await docRef.get();
-      return docSnap.exists ? docSnap.data() as User : undefined;
+      if (!docSnap.exists) return undefined;
+      return applyUsernameFallback(docSnap.data() as User);
   },
   saveUser: async (user: User): Promise<void> => {
       const { password, ...userData } = user; // Never store password in Firestore
@@ -298,7 +314,8 @@ export const db = {
         pointAdjustmentsCol.orderBy("timestamp", "desc").get(),
     ]);
 
-    const users = usersSnap.docs.map(d => d.data() as User);
+    const usersData = usersSnap.docs.map(d => d.data() as User);
+    const users = usersData.map(applyUsernameFallback);
     const allPredictions = predictionsSnap.docs.map(d => d.data() as Prediction);
     const officialResults = resultsSnap.docs.map(d => d.data() as OfficialResult);
     const pointAdjustments = adjustmentsSnap.docs.map(d => d.data() as PointAdjustment);
@@ -308,7 +325,7 @@ export const db = {
     users.forEach(user => {
         scores[user.id] = {
             userId: user.id,
-            userUsername: user.username || user.email.split('@')[0],
+            userUsername: user.username,
             userAvatar: user.avatar,
             totalPoints: 0,
             details: { exactPole: 0, exactP1: 0, exactFastestLap: 0 },
