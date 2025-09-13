@@ -308,7 +308,7 @@ export const db = {
     users.forEach(user => {
         scores[user.id] = {
             userId: user.id,
-            userUsername: user.username,
+            userUsername: user.username || user.email.split('@')[0],
             userAvatar: user.avatar,
             totalPoints: 0,
             details: { exactPole: 0, exactP1: 0, exactFastestLap: 0 },

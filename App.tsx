@@ -55,7 +55,7 @@ const App: React.FC = () => {
                         <Route path="/tournaments" element={
                             <PrivateRoute><TournamentsPage /></PrivateRoute>
                         } />
-                         <Route path="/results/:userId" element={
+                         <Route path="/results/:userId/:gpId" element={
                             <PrivateRoute><ResultsReviewPage /></PrivateRoute>
                         } />
 

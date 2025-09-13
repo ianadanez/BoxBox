@@ -283,8 +283,9 @@ const Header: React.FC = () => {
 
                                 {/* Profile Dropdown */}
                                 <div ref={profileMenuRef} className="relative">
-                                    <button onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)} className="flex items-center space-x-2">
+                                     <button onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)} className="flex items-center space-x-2 p-1 rounded-md hover:bg-[var(--background-light)] transition-colors">
                                         <Avatar avatar={user.avatar} className="w-8 h-8" />
+                                        <span className="hidden md:block text-sm font-medium text-[var(--text-primary)]">{user.username}</span>
                                     </button>
                                     {isProfileMenuOpen && (
                                         <div className="absolute right-0 mt-2 w-48 bg-[var(--background-medium)] rounded-lg shadow-2xl shadow-black/50 border border-[var(--border-color)] py-1 z-20">

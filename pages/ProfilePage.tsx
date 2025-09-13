@@ -1,8 +1,9 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { Avatar as AvatarType, SeasonTotal, User } from '../types';
+import { Avatar as AvatarType, GpScore, User, SeasonTotal } from '../types';
 import Avatar from '../components/common/Avatar';
 import AvatarEditor from '../components/common/AvatarEditor';
 import { db } from '../services/db';
@@ -22,7 +23,8 @@ const ProfilePage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [canPoke, setCanPoke] = useState(false);
     const [pokeCooldown, setPokeCooldown] = useState(false);
-    const [hasAnyResults, setHasAnyResults] = useState(false);
+    const [gpScores, setGpScores] = useState<GpScore[]>([]);
+
 
     const isOwnProfile = currentUser?.id === userId;
 
@@ -34,10 +36,11 @@ const ProfilePage: React.FC = () => {
             }
             setLoading(true);
             try {
-                const [userToView, seasonTotals, officialResults] = await Promise.all([
+                const [userToView, seasonTotals, allOfficialResults, userPredictions] = await Promise.all([
                     db.getUserById(userId),
                     db.calculateSeasonTotals(),
                     db.getOfficialResults(),
+                    db.getPredictionsForUser(userId),
                 ]);
 
                 if (userToView) {
@@ -50,8 +53,27 @@ const ProfilePage: React.FC = () => {
                     
                     const userStats = seasonTotals.find(s => s.userId === userToView.id);
                     setStats(userStats || null);
-                    setHasAnyResults(officialResults.length > 0);
                     
+                    if (allOfficialResults.length > 0) {
+                        const scores: GpScore[] = [];
+                        for (const result of allOfficialResults) {
+                            const prediction = userPredictions.find(p => p.gpId === result.gpId);
+                            if (prediction) {
+                                const score = await db.calculateGpScore(prediction, result);
+                                scores.push(score);
+                            } else {
+                                const gp = (await db.getSchedule()).find(g => g.id === result.gpId);
+                                scores.push({
+                                    gpId: result.gpId,
+                                    gpName: gp?.name || `GP ${result.gpId}`,
+                                    totalPoints: 0,
+                                    breakdown: { pole: 0, sprintPole: 0, sprintPodium: 0, racePodium: 0, fastestLap: 0, driverOfTheDay: 0 }
+                                });
+                            }
+                        }
+                        setGpScores(scores.sort((a, b) => b.gpId - a.gpId));
+                    }
+
                 } else {
                     setProfileUser(null);
                 }
@@ -194,6 +216,29 @@ const ProfilePage: React.FC = () => {
                         </div>
                        )}
                     </div>
+                    <div className="bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)]">
+                        <h2 className="text-2xl font-bold f1-red-text mb-4">Resultados de la Temporada</h2>
+                        {gpScores.length > 0 ? (
+                            <div className="space-y-4">
+                                {gpScores.map(score => (
+                                    <div key={score.gpId} className="bg-[var(--background-light)] p-4 rounded-lg flex items-center justify-between flex-wrap gap-2">
+                                        <div>
+                                            <p className="font-bold text-lg text-white">{score.gpName}</p>
+                                            <p className="text-sm text-gray-400">Puntos Obtenidos: <span className="font-bold text-[var(--accent-blue)]">{score.totalPoints}</span></p>
+                                        </div>
+                                        <Link 
+                                            to={`/results/${profileUser.id}/${score.gpId}`}
+                                            className="bg-[var(--accent-blue)] text-black font-bold py-2 px-4 rounded-md hover:opacity-80 transition-opacity text-sm"
+                                        >
+                                            Ver Desglose
+                                        </Link>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-[var(--text-secondary)]">No hay resultados de Grandes Premios para mostrar todavía.</p>
+                        )}
+                    </div>
                 </div>
 
                 {/* Sidebar */}
@@ -220,17 +265,6 @@ const ProfilePage: React.FC = () => {
                         </div>
                     ) : (
                         <p className="text-[var(--text-secondary)]">Aún no hay estadísticas disponibles para esta temporada.</p>
-                    )}
-
-                    {hasAnyResults && profileUser && (
-                        <div className="mt-6">
-                            <Link
-                                to={`/results/${profileUser.id}`}
-                                className="w-full block text-center bg-[var(--accent-blue)] text-black font-bold py-3 px-6 rounded-md transition-all hover:bg-opacity-80 transform hover:scale-105"
-                            >
-                                Ver Resultados del Último GP
-                            </Link>
-                        </div>
                     )}
 
                     {!isOwnProfile && currentUser && (

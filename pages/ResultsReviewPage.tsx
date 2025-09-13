@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
@@ -131,12 +132,12 @@ const PodiumComparisonCard: React.FC<{
 };
 
 const ResultsReviewPage: React.FC = () => {
-    const { userId } = useParams<{ userId: string }>();
+    const { userId, gpId } = useParams<{ userId: string, gpId: string }>();
     const navigate = useNavigate();
 
     const [loading, setLoading] = useState(true);
     const [profileUser, setProfileUser] = useState<User | null>(null);
-    const [lastGp, setLastGp] = useState<GrandPrix | null>(null);
+    const [currentGp, setCurrentGp] = useState<GrandPrix | null>(null);
     const [userPrediction, setUserPrediction] = useState<Prediction | null>(null);
     const [officialResult, setOfficialResult] = useState<OfficialResult | null>(null);
     const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -145,27 +146,28 @@ const ResultsReviewPage: React.FC = () => {
     
     useEffect(() => {
         const fetchData = async () => {
-            if (!userId) {
+            if (!userId || !gpId) {
                 navigate('/');
                 return;
             }
             setLoading(true);
             try {
+                 const numericGpId = Number(gpId);
                 const [
                     userToView,
                     allDrivers,
                     allTeams,
-                    allGps,
-                    allOfficialResults,
+                    gpData,
+                    resultData,
                 ] = await Promise.all([
                     db.getUserById(userId),
                     db.getDrivers(),
                     db.getTeams(),
-                    db.getSchedule(),
-                    db.getOfficialResults(),
+                    db.getSchedule().then(s => s.find(g => g.id === numericGpId)),
+                    db.getOfficialResult(numericGpId)
                 ]);
 
-                if (!userToView) {
+                if (!userToView || !gpData || !resultData) {
                     navigate('/'); 
                     return;
                 }
@@ -173,19 +175,15 @@ const ResultsReviewPage: React.FC = () => {
                 setProfileUser(userToView);
                 setDrivers(allDrivers);
                 setTeams(allTeams);
+                setCurrentGp(gpData);
+                setOfficialResult(resultData);
 
-                const lastResult = [...allOfficialResults].sort((a,b) => b.gpId - a.gpId)[0];
+                const prediction = await db.getPrediction(userId, numericGpId);
+                const score = prediction ? await db.calculateGpScore(prediction, resultData) : null;
 
-                if (lastResult) {
-                    const gp = allGps.find(g => g.id === lastResult.gpId) || null;
-                    const prediction = await db.getPrediction(userId, lastResult.gpId);
-                    const score = prediction ? await db.calculateGpScore(prediction, lastResult) : null;
-                    
-                    setOfficialResult(lastResult);
-                    setLastGp(gp);
-                    setUserPrediction(prediction || null);
-                    setGpScore(score);
-                }
+                setUserPrediction(prediction || null);
+                setGpScore(score);
+
             } catch (error) {
                 console.error("Error loading results review page:", error);
             } finally {
@@ -193,17 +191,17 @@ const ResultsReviewPage: React.FC = () => {
             }
         };
         fetchData();
-    }, [userId, navigate]);
+    }, [userId, gpId, navigate]);
 
     if (loading) {
         return <div className="text-center p-8">Cargando resultados...</div>;
     }
 
-    if (!lastGp || !officialResult) {
+    if (!currentGp || !officialResult) {
         return (
             <div className="container mx-auto p-4 md:p-8 max-w-7xl text-center">
-                <h1 className="text-3xl font-bold mb-4">Sin Resultados</h1>
-                <p className="text-[var(--text-secondary)]">Aún no se han publicado resultados oficiales esta temporada.</p>
+                <h1 className="text-3xl font-bold mb-4">Resultados no Encontrados</h1>
+                <p className="text-[var(--text-secondary)]">No se pudieron cargar los resultados para este Gran Premio.</p>
                 <Link to="/" className="mt-6 inline-block bg-[var(--accent-red)] text-white font-bold py-2 px-4 rounded">Volver al inicio</Link>
             </div>
         );
@@ -215,7 +213,7 @@ const ResultsReviewPage: React.FC = () => {
                 {profileUser && <Avatar avatar={profileUser.avatar} className="w-12 h-12" />}
                 <div>
                     <h1 className="text-2xl md:text-3xl font-bold text-white">Análisis de Resultados: {profileUser?.username}</h1>
-                    <h2 className="text-lg text-gray-400">Fin de semana del {lastGp.name}</h2>
+                    <h2 className="text-lg text-gray-400">Fin de semana del {currentGp.name}</h2>
                 </div>
             </div>
 
@@ -236,7 +234,7 @@ const ResultsReviewPage: React.FC = () => {
                     drivers={drivers} teams={teams}
                 />
 
-                {lastGp.hasSprint && (
+                {currentGp.hasSprint && (
                     <>
                         <ComparisonCard 
                             title="Sprint Pole"
