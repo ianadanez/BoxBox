@@ -58,7 +58,9 @@ const ProfilePage: React.FC = () => {
                         const scores: GpScore[] = [];
                         for (const result of allOfficialResults) {
                             const prediction = userPredictions.find(p => p.gpId === result.gpId);
-                            if (prediction) {
+                            // FIX: Add defensive check to ensure the prediction belongs to the current profile user.
+                            // This prevents a rare data consistency issue where a new user might see another's predictions.
+                            if (prediction && prediction.userId === userId) {
                                 const score = await db.calculateGpScore(prediction, result);
                                 scores.push(score);
                             } else {
