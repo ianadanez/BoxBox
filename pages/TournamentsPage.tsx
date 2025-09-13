@@ -237,7 +237,7 @@ const TournamentsPage: React.FC = () => {
                                 <thead className="border-b-2 border-[var(--border-color)]">
                                     <tr>
                                         <th className="p-3 text-sm font-semibold tracking-wide text-center">Pos</th>
-                                        <th className="p-3 text-sm font-semibold tracking-wide" colSpan={2}>Usuario</th>
+                                        <th className="p-3 text-sm font-semibold tracking-wide">Usuario</th>
                                         <th className="p-3 text-sm font-semibold tracking-wide text-right">Puntos</th>
                                     </tr>
                                 </thead>
@@ -245,14 +245,10 @@ const TournamentsPage: React.FC = () => {
                                     {tournamentRanking.map((score, index) => (
                                         <tr key={score.userId} className="border-b border-[var(--border-color)]">
                                             <td className="p-3 text-lg font-bold text-center text-[var(--text-secondary)]">{index + 1}</td>
-                                            <td className="p-2">
-                                                <Link to={`/profile/${score.userId}`}>
-                                                    <Avatar avatar={score.userAvatar} className="w-10 h-10" />
-                                                </Link>
-                                            </td>
                                             <td className="p-2 font-medium">
-                                                <Link to={`/profile/${score.userId}`} className="hover:text-[var(--accent-red)] transition-colors">
-                                                    {score.userUsername}
+                                                <Link to={`/profile/${score.userId}`} className="flex items-center space-x-3 group">
+                                                    <Avatar avatar={score.userAvatar} className="w-10 h-10" />
+                                                    <span className="group-hover:text-[var(--accent-red)] transition-colors">{score.userUsername}</span>
                                                 </Link>
                                             </td>
                                             <td className="p-3 text-right font-mono text-lg font-bold text-[var(--accent-blue)]">{score.totalPoints}</td>
