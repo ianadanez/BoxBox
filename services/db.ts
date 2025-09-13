@@ -152,22 +152,26 @@ export const db = {
       const docSnap = await docRef.get();
       return docSnap.exists ? docSnap.data() as OfficialResult : undefined;
   },
-  publishResult: async (result: OfficialResult): Promise<void> => {
+  publishSessionResults: async (gpId: number, session: 'quali' | 'sprint' | 'race', sessionResults: Partial<Result>, manualOverrides: Partial<OfficialResult['manualOverrides']>): Promise<void> => {
       const batch = firestore.batch();
+      const resultRef = resultsCol.doc(String(gpId));
       
-      const resultRef = resultsCol.doc(String(result.gpId));
-      batch.set(resultRef, result, { merge: true });
-
-      const draftRef = draftResultsCol.doc(String(result.gpId));
-      batch.delete(draftRef);
-
-      const predictionsSnap = await predictionsCol.where("gpId", "==", result.gpId).get();
-      const predictions = predictionsSnap.docs.map(p => p.data() as Prediction);
-      const gpSnap = await scheduleCol.doc(String(result.gpId)).get();
-      // FIX: Ensure gp exists before trying to access its data.
+      const resultDataToSave = {
+          ...sessionResults,
+          gpId,
+          publishedAt: new Date().toISOString(),
+          publishedSessions: firebase.firestore.FieldValue.arrayUnion(session),
+          manualOverrides
+      };
+      
+      batch.set(resultRef, resultDataToSave, { merge: true });
+      
+      const gpSnap = await scheduleCol.doc(String(gpId)).get();
       const gp = gpSnap.exists ? gpSnap.data() as GrandPrix : undefined;
-      
-      const userIds = [...new Set(predictions.map(p => p.userId))];
+      const gpName = gp ? gp.name : `GP ${gpId}`;
+
+      const predictionsSnap = await predictionsCol.where("gpId", "==", gpId).get();
+      const userIds = [...new Set(predictionsSnap.docs.map(p => (p.data() as Prediction).userId))];
 
       for (const userId of userIds) {
           const notifRef = notificationsCol.doc();
@@ -175,9 +179,9 @@ export const db = {
               id: notifRef.id,
               toUserId: userId,
               type: 'results',
-              gpId: result.gpId,
-              // FIX: Safely access gp.name, providing a fallback if gp is undefined, to prevent type errors.
-              gpName: gp ? gp.name : `GP ${result.gpId}`,
+              gpId,
+              gpName,
+              session,
               timestamp: new Date().toISOString(),
               seen: false,
           };
@@ -186,11 +190,56 @@ export const db = {
       
       await batch.commit();
   },
+  // FIX: Added missing `publishResult` function that was called from the Admin page.
+  // This function saves a full result set and sends notifications for any newly published sessions.
+  publishResult: async (result: OfficialResult): Promise<void> => {
+    const batch = firestore.batch();
+    const resultRef = resultsCol.doc(String(result.gpId));
+
+    const existingResultSnap = await resultRef.get();
+    const existingResult = existingResultSnap.exists ? existingResultSnap.data() as OfficialResult : null;
+    const existingSessions = existingResult?.publishedSessions || [];
+    
+    const newSessions = result.publishedSessions.filter(s => !existingSessions.includes(s));
+
+    batch.set(resultRef, result, { merge: true });
+
+    if (newSessions.length > 0) {
+        const gpSnap = await scheduleCol.doc(String(result.gpId)).get();
+        const gp = gpSnap.exists ? gpSnap.data() as GrandPrix : undefined;
+        const gpName = gp ? gp.name : `GP ${result.gpId}`;
+
+        const predictionsSnap = await predictionsCol.where("gpId", "==", result.gpId).get();
+        const userIds = [...new Set(predictionsSnap.docs.map(p => (p.data() as Prediction).userId))];
+
+        for (const session of newSessions) {
+            for (const userId of userIds) {
+                const notifRef = notificationsCol.doc();
+                const notification: ResultsNotification = {
+                    id: notifRef.id,
+                    toUserId: userId,
+                    type: 'results',
+                    gpId: result.gpId,
+                    gpName,
+                    session,
+                    timestamp: new Date().toISOString(),
+                    seen: false,
+                };
+                batch.set(notifRef, notification);
+            }
+        }
+    }
+    await batch.commit();
+  },
+
 
   // Scoring
   calculateGpScore: async (prediction: Prediction, result: OfficialResult): Promise<GpScore> => {
+    const gp = (await scheduleCol.doc(String(result.gpId)).get()).data() as GrandPrix;
+    
     const score: GpScore = {
         gpId: result.gpId,
+        gpName: gp?.name || `GP ${result.gpId}`,
         totalPoints: 0,
         breakdown: {
             pole: 0, sprintPole: 0, sprintPodium: 0,

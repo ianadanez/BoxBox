@@ -660,12 +660,29 @@ const ResultsManagement: React.FC = () => {
     const handlePublish = async () => {
         if(!selectedGp || !user) return;
         setLoading(true);
+        
+        // FIX: Correctly determine which sessions have results to build the `publishedSessions` array.
+        const publishedSessions: ('quali' | 'sprint' | 'race')[] = [];
+        if (editableResult.pole) {
+            publishedSessions.push('quali');
+        }
+        if (selectedGp.hasSprint && (editableResult.sprintPole || editableResult.sprintPodium?.some(d => d))) {
+            publishedSessions.push('sprint');
+        }
+        if (editableResult.racePodium?.some(d => d) || editableResult.fastestLap || editableResult.driverOfTheDay) {
+            publishedSessions.push('race');
+        }
+
+        // FIX: Construct a valid `OfficialResult` object, ensuring `publishedSessions` is included.
         const resultToPublish: OfficialResult = {
             ...(editableResult as Result),
             gpId: selectedGp.id,
             publishedAt: new Date().toISOString(),
-            manualOverrides: manualOverrides
+            manualOverrides: manualOverrides,
+            publishedSessions: [...new Set([...(officialResult?.publishedSessions || []), ...publishedSessions])]
         };
+        
+        // FIX: Call the correct, newly implemented `publishResult` function from the db service.
         await db.publishResult(resultToPublish);
         setOfficialResult(resultToPublish);
         setDraftResult(null); 

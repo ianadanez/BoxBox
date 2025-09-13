@@ -69,6 +69,7 @@ export interface Result {
 
 export interface OfficialResult extends Result {
   publishedAt: string;
+  publishedSessions: ('quali' | 'sprint' | 'race')[];
   manualOverrides: { [key in keyof Omit<Result, 'gpId'>]?: { user: string, reason: string } };
 }
 
@@ -107,6 +108,7 @@ export interface ResultsNotification extends BaseNotification {
     type: 'results';
     gpId: number;
     gpName: string;
+    session: 'quali' | 'sprint' | 'race';
 }
 
 export interface PointsAdjustmentNotification extends BaseNotification {
@@ -156,6 +158,7 @@ export interface Score {
 
 export interface GpScore {
   gpId: number;
+  gpName: string;
   totalPoints: number;
   breakdown: {
     pole: number;
