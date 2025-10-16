@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -291,7 +290,7 @@ const CalendarManagement: React.FC = () => {
     const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value, type, checked } = e.target;
         if (name.startsWith('events.')) {
-            const eventName = name.split('.')[1] as 'quali' | 'sprint' | 'race';
+            const eventName = name.split('.')[1] as 'quali' | 'sprint' | 'race' | 'sprintQuali';
             setFormState(prev => prev ? { ...prev, events: { ...prev.events, [eventName]: new Date(value).toISOString() } } : null);
         } else {
             setFormState(prev => prev ? { ...prev, [name]: type === 'checkbox' ? checked : value } : null);
@@ -310,11 +309,11 @@ const CalendarManagement: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formState || !formState.name || !formState.country || !formState.track || !formState.events?.quali || !formState.events?.race) {
-            alert("Todos los campos (excepto Sprint) son requeridos.");
+            alert("Todos los campos (excepto los de Sprint) son requeridos.");
             return;
         }
-        if (formState.hasSprint && !formState.events?.sprint) {
-            alert("La fecha del Sprint es requerida si la opción está activada.");
+        if (formState.hasSprint && (!formState.events?.sprint || !formState.events?.sprintQuali)) {
+            alert("Las fechas del Sprint y de la Clasificación del Sprint son requeridas si la opción está activada.");
             return;
         }
 
@@ -329,6 +328,7 @@ const CalendarManagement: React.FC = () => {
 
         if (!gpToSave.hasSprint) {
             delete gpToSave.events.sprint;
+            delete gpToSave.events.sprintQuali;
         }
 
         await db.saveGp(gpToSave);
@@ -399,9 +399,15 @@ const CalendarManagement: React.FC = () => {
                         </div>
                     </div>
                     {formState.hasSprint && (
-                        <div>
-                           <label className="block text-sm text-[var(--text-secondary)]">Sprint (tu hora local)</label>
-                           <input type="datetime-local" name="events.sprint" value={toInputDateTime(formState.events?.sprint)} onChange={handleFormChange} required={formState.hasSprint} className="w-full md:w-1/3 p-2 bg-[var(--background-light)] rounded border border-[var(--border-color)] focus:ring-2 focus:ring-[var(--accent-red)]"/>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm text-[var(--text-secondary)]">Clasificación Sprint (tu hora local)</label>
+                                <input type="datetime-local" name="events.sprintQuali" value={toInputDateTime(formState.events?.sprintQuali)} onChange={handleFormChange} required={formState.hasSprint} className="w-full p-2 bg-[var(--background-light)] rounded border border-[var(--border-color)] focus:ring-2 focus:ring-[var(--accent-red)]"/>
+                            </div>
+                            <div>
+                                <label className="block text-sm text-[var(--text-secondary)]">Sprint (tu hora local)</label>
+                                <input type="datetime-local" name="events.sprint" value={toInputDateTime(formState.events?.sprint)} onChange={handleFormChange} required={formState.hasSprint} className="w-full p-2 bg-[var(--background-light)] rounded border border-[var(--border-color)] focus:ring-2 focus:ring-[var(--accent-red)]"/>
+                            </div>
                         </div>
                     )}
                     <div className="flex space-x-4">

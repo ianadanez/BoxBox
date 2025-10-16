@@ -40,6 +40,7 @@ export interface GrandPrix {
   hasSprint: boolean;
   events: {
     quali: string; // ISO date string
+    sprintQuali?: string; // ISO date string
     sprint?: string; // ISO date string
     race: string; // ISO date string
   };

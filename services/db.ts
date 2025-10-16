@@ -187,6 +187,7 @@ export const db = {
       const gpName = gp ? gp.name : `GP ${gpId}`;
 
       const predictionsSnap = await predictionsCol.where("gpId", "==", gpId).get();
+      // FIX: Explicitly cast document data to Prediction to correctly type userId.
       const userIds = [...new Set(predictionsSnap.docs.map(p => (p.data() as Prediction).userId))];
 
       for (const userId of userIds) {
@@ -226,6 +227,7 @@ export const db = {
         const gpName = gp ? gp.name : `GP ${result.gpId}`;
 
         const predictionsSnap = await predictionsCol.where("gpId", "==", result.gpId).get();
+        // FIX: Explicitly cast document data to Prediction to correctly type userId.
         const userIds = [...new Set(predictionsSnap.docs.map(p => (p.data() as Prediction).userId))];
 
         for (const session of newSessions) {
