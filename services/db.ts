@@ -1,5 +1,6 @@
 
 
+
 import { User, Team, Driver, GrandPrix, Prediction, OfficialResult, Result, Tournament, Score, SeasonTotal, PointAdjustment, Notification, PokeNotification, TournamentInviteNotification, ResultsNotification, PointsAdjustmentNotification, TournamentInviteAcceptedNotification, TournamentInviteDeclinedNotification, GpScore } from '../types';
 import { TEAMS, DRIVERS, GP_SCHEDULE, SCORING_RULES } from '../constants';
 // FIX: Added firebase compat import for FieldValue operations.
@@ -176,7 +177,10 @@ export const db = {
           ...sessionResults,
           gpId,
           publishedAt: new Date().toISOString(),
-          publishedSessions: firebase.firestore.FieldValue.arrayUnion(session),
+          // FIX: The type of `FieldValue` from arrayUnion is not compatible with the `string[]`
+          // type on the OfficialResult interface. Casting to `any` allows Firestore's SDK
+          // to handle the special FieldValue type at runtime while satisfying TypeScript.
+          publishedSessions: firebase.firestore.FieldValue.arrayUnion(session) as any,
           manualOverrides
       };
       
@@ -227,8 +231,9 @@ export const db = {
         const gpName = gp ? gp.name : `GP ${result.gpId}`;
 
         const predictionsSnap = await predictionsCol.where("gpId", "==", result.gpId).get();
-        // FIX: Explicitly cast document data to Prediction to correctly type userId.
-        const userIds = [...new Set(predictionsSnap.docs.map(p => (p.data() as Prediction).userId))];
+        // FIX: Explicitly cast document data's `userId` property to string to resolve a type mismatch.
+        // Data from Firestore is `any`, which can be treated as `unknown` in some contexts.
+        const userIds = [...new Set(predictionsSnap.docs.map(p => p.data().userId as string))];
 
         for (const session of newSessions) {
             for (const userId of userIds) {

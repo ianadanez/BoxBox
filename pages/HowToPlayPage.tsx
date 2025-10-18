@@ -103,16 +103,34 @@ const HowToPlayPage: React.FC = () => {
                 Antes de que comience la acción en la pista para cada Gran Premio, tendrás la oportunidad de hacer tus predicciones. La página de <Link to="/" className="text-[var(--accent-blue)] font-semibold hover:underline">Predecir</Link> se habilitará para el próximo GP.
             </p>
             <p>Deberás predecir los siguientes resultados:</p>
-            <ul className="list-none space-y-2 pl-4">
-                <li className="flex items-center"><ChevronRightIcon className="h-5 w-5 text-[var(--accent-red)] mr-2 flex-shrink-0" /> Pole Position (Clasificación Principal)</li>
-                <li className="flex items-center"><ChevronRightIcon className="h-5 w-5 text-[var(--accent-red)] mr-2 flex-shrink-0" /> Podio de la Carrera (P1, P2 y P3)</li>
-                <li className="flex items-center"><ChevronRightIcon className="h-5 w-5 text-[var(--accent-red)] mr-2 flex-shrink-0" /> Vuelta Rápida</li>
-                <li className="flex items-center"><ChevronRightIcon className="h-5 w-5 text-[var(--accent-red)] mr-2 flex-shrink-0" /> Piloto del Día</li>
+            <ul className="list-none space-y-4 pl-4">
+                <li className="flex items-start">
+                    <ChevronRightIcon className="h-5 w-5 text-[var(--accent-red)] mr-2 flex-shrink-0 mt-1" />
+                    <div><span className="font-semibold text-white">Pole Position (Clasificación Principal):</span> El piloto que logra el tiempo más rápido en la sesión de clasificación (Q3) y comienza la carrera del domingo en la primera posición.</div>
+                </li>
+                <li className="flex items-start">
+                    <ChevronRightIcon className="h-5 w-5 text-[var(--accent-red)] mr-2 flex-shrink-0 mt-1" />
+                    <div><span className="font-semibold text-white">Podio de la Carrera (P1, P2 y P3):</span> Los tres pilotos que terminan la carrera principal en primer, segundo y tercer lugar. ¡El orden importa!</div>
+                </li>
+                <li className="flex items-start">
+                    <ChevronRightIcon className="h-5 w-5 text-[var(--accent-red)] mr-2 flex-shrink-0 mt-1" />
+                    <div><span className="font-semibold text-white">Vuelta Rápida:</span> El piloto que consigue el tiempo de vuelta más rápido durante la carrera del domingo.</div>
+                </li>
+                <li className="flex items-start">
+                    <ChevronRightIcon className="h-5 w-5 text-[var(--accent-red)] mr-2 flex-shrink-0 mt-1" />
+                    <div><span className="font-semibold text-white">Piloto del Día:</span> El piloto votado por los fans como el mejor de la carrera, anunciado oficialmente al final de la transmisión.</div>
+                </li>
             </ul>
              <p>En los fines de semana con <strong>formato Sprint</strong>, también deberás predecir:</p>
-             <ul className="list-none space-y-2 pl-4">
-                <li className="flex items-center"><ChevronRightIcon className="h-5 w-5 text-[var(--accent-red)] mr-2 flex-shrink-0" /> Pole del Sprint</li>
-                <li className="flex items-center"><ChevronRightIcon className="h-5 w-5 text-[var(--accent-red)] mr-2 flex-shrink-0" /> Podio del Sprint (P1, P2 y P3)</li>
+             <ul className="list-none space-y-4 pl-4">
+                <li className="flex items-start">
+                    <ChevronRightIcon className="h-5 w-5 text-[var(--accent-red)] mr-2 flex-shrink-0 mt-1" />
+                    <div><span className="font-semibold text-white">Pole del Sprint:</span> El piloto que logra el tiempo más rápido en la clasificación específica para el Sprint (Sprint Shootout) y comienza el Sprint en primera posición.</div>
+                </li>
+                <li className="flex items-start">
+                    <ChevronRightIcon className="h-5 w-5 text-[var(--accent-red)] mr-2 flex-shrink-0 mt-1" />
+                    <div><span className="font-semibold text-white">Podio del Sprint (P1, P2 y P3):</span> Los tres pilotos que terminan la carrera Sprint en primer, segundo y tercer lugar.</div>
+                </li>
             </ul>
             <div className="bg-yellow-900/50 border border-yellow-600 text-yellow-300 text-sm p-4 rounded-lg mt-4">
                 <p className="font-bold">¡IMPORTANTE!</p>
