@@ -1,12 +1,12 @@
 
 import React, { Suspense, useState, useEffect } from 'react';
-import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import CookieConsent from './components/common/CookieConsent';
 import LoadingSpinner from './components/common/LoadingSpinner';
-import { checkIsOffSeason, debugGetAllSeasons } from './services/seasonService'; // Import the debug service
+import { checkIsOffSeason } from './services/seasonService'; // Import the service
 
 // Lazy Load Pages
 const HomePage = React.lazy(() => import('./pages/HomePage'));
@@ -32,17 +32,14 @@ const PrivateRoute: React.FC<{ children: React.ReactNode, adminOnly?: boolean }>
 
 const AppRoutes: React.FC = () => {
     const [isOffSeason, setIsOffSeason] = useState<boolean | null>(null);
-    const location = useLocation();
 
     useEffect(() => {
         const determineSeasonStatus = async () => {
-            // DEBUG: Log all seasons to the console
-            await debugGetAllSeasons();
             const offSeasonStatus = await checkIsOffSeason();
             setIsOffSeason(offSeasonStatus);
         };
         determineSeasonStatus();
-    }, [location]);
+    }, []);
 
     if (isOffSeason === null) {
         return <LoadingSpinner />;
