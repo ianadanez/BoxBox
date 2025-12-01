@@ -1,17 +1,12 @@
 
-import React, { Suspense, useEffect, useState } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import CookieConsent from './components/common/CookieConsent';
 import LoadingSpinner from './components/common/LoadingSpinner';
-import { checkIsOffSeason } from './services/seasonService';
-
-// =========================================================================================
-// TEMPORARY MIGRATION - This will be removed after execution
-import { runTempMigration } from './temp-migration';
-// =========================================================================================
+import { checkIsOffSeason } from './services/seasonService'; // Import the service
 
 // Lazy Load Pages
 const HomePage = React.lazy(() => import('./pages/HomePage'));
@@ -69,12 +64,6 @@ const AppRoutes: React.FC = () => {
 }
 
 const App: React.FC = () => {
-  
-  // Run the temporary migration once on app load.
-  useEffect(() => {
-    runTempMigration();
-  }, []);
-
   return (
     <AuthProvider>
         <HashRouter>
