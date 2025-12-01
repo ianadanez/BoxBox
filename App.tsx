@@ -1,6 +1,6 @@
 
 import React, { Suspense, useState, useEffect } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -32,6 +32,7 @@ const PrivateRoute: React.FC<{ children: React.ReactNode, adminOnly?: boolean }>
 
 const AppRoutes: React.FC = () => {
     const [isOffSeason, setIsOffSeason] = useState<boolean | null>(null);
+    const location = useLocation();
 
     useEffect(() => {
         const determineSeasonStatus = async () => {
@@ -39,7 +40,7 @@ const AppRoutes: React.FC = () => {
             setIsOffSeason(offSeasonStatus);
         };
         determineSeasonStatus();
-    }, []);
+    }, [location]);
 
     if (isOffSeason === null) {
         return <LoadingSpinner />;
