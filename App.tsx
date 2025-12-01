@@ -1,9 +1,10 @@
 
-
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Header from './components/Header';
+import Footer from './components/Footer';
+import CookieConsent from './components/common/CookieConsent';
 import HomePage from './pages/HomePage';
 import PredictionsPage from './pages/PredictionsPage';
 import TournamentsPage from './pages/TournamentsPage';
@@ -37,9 +38,9 @@ const App: React.FC = () => {
   return (
     <AuthProvider>
         <HashRouter>
-            <div className="min-h-screen bg-[var(--background-dark)] text-[var(--text-primary)]">
+            <div className="min-h-screen bg-[var(--background-dark)] text-[var(--text-primary)] flex flex-col">
                 <Header />
-                <main>
+                <main className="flex-grow">
                     <Routes>
                         <Route path="/" element={<HomePage />} />
                         <Route path="/login" element={<LoginPage />} />
@@ -66,6 +67,8 @@ const App: React.FC = () => {
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                 </main>
+                <Footer />
+                <CookieConsent />
             </div>
         </HashRouter>
     </AuthProvider>

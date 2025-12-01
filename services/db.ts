@@ -1,3 +1,4 @@
+
 import { User, Team, Driver, GrandPrix, Prediction, OfficialResult, Result, Tournament, Score, SeasonTotal, PointAdjustment, Notification, PokeNotification, TournamentInviteNotification, ResultsNotification, PointsAdjustmentNotification, TournamentInviteAcceptedNotification, TournamentInviteDeclinedNotification, GpScore } from '../types';
 import { TEAMS, DRIVERS, GP_SCHEDULE, SCORING_RULES } from '../constants';
 import { engine } from './engine';
@@ -76,10 +77,10 @@ export const db = {
       return applyUsernameFallback(docSnap.data() as User);
   },
   saveUser: async (user: User): Promise<void> => {
-      const { password, ...userData } = user; // Never store password in Firestore
-      // FIX: Use compat API `doc()` and `set()` methods.
+      // FIX: Password is no longer in User type, so we don't need to destructure it out.
+      // We save the user object directly.
       const docRef = usersCol.doc(user.id);
-      await docRef.set(userData, { merge: true });
+      await docRef.set(user, { merge: true });
   },
 
   // Catalogue

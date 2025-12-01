@@ -1,1 +1,98 @@
-��^
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Helper Functions ---
+    
+    // Check if user is logged in
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Check if the user is accessing their own data
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Check if the user has the 'admin' role in their user document
+    // Note: This costs 1 read per write operation.
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // --- Collections ---
+
+    // USERS:
+    // Anyone signed in can read users (for leaderboards/search).
+    // Only the user themselves or an admin can edit the profile.
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId) || isAdmin();
+    }
+
+    // TEAMS & DRIVERS & SCHEDULE:
+    // Publicly readable. Only admins can write.
+    match /teams/{teamId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /drivers/{driverId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /schedule/{gpId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // PREDICTIONS:
+    // Users can read any prediction (open game).
+    // Users can only write their own prediction.
+    // The 'gpId' part of the ID isn't easily checked here without parsing, 
+    // so we rely on the rule `request.resource.data.userId == request.auth.uid`.
+    match /predictions/{predictionId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      // Allow admins to delete or modify if strictly necessary (optional)
+      allow delete: if isAdmin();
+    }
+
+    // RESULTS & DRAFT_RESULTS:
+    // Publicly readable (official). Drafts only for admins.
+    match /results/{gpId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /draft_results/{gpId} {
+      allow read, write: if isAdmin();
+    }
+
+    // TOURNAMENTS:
+    // Authenticated users can read tournaments.
+    // Logic for joining/leaving is complex, initially allowing authenticated write
+    // to support the arrayUnion/arrayRemove logic. 
+    // In a stricter version, we would verify the user is adding THEMSELVES to the array.
+    match /tournaments/{tournamentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn(); 
+      allow delete: if isSignedIn() && (resource.data.creatorId == request.auth.uid || isAdmin());
+    }
+
+    // NOTIFICATIONS:
+    // Users can only read/write their own notifications.
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && (resource.data.toUserId == request.auth.uid || resource.data.fromUserId == request.auth.uid);
+      allow create: if isSignedIn(); // Users create notifications (pokes, invites) for others
+      allow update, delete: if isSignedIn() && resource.data.toUserId == request.auth.uid;
+    }
+
+    // POINT ADJUSTMENTS:
+    // Public read (transparency), Admin write only.
+    match /pointAdjustments/{adjId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+  }
+}

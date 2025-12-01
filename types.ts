@@ -1,10 +1,9 @@
 
-
 export interface User {
   id: string;
   username: string;
   email: string; // Used as a unique identifier for login
-  password?: string; // Stored plaintext for local demo. DO NOT USE IN PRODUCTION.
+  // Password removed for security. Auth is handled by Firebase Auth.
   role: 'user' | 'admin';
   avatar: Avatar;
   favoriteTeamId?: string;
