@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { GrandPrix, Driver, Prediction, Team } from '../types';
 import { db } from '../services/db';
-import { LOCK_MINUTES_BEFORE } from '../constants';
+import { engine } from '../services/engine';
 import DriverAutocomplete from '../components/common/DriverAutocomplete';
 
 const PredictionsPage: React.FC = () => {
@@ -61,20 +61,10 @@ const PredictionsPage: React.FC = () => {
   useEffect(() => {
     if (!gp) return;
     
-    const getLockTime = (eventTime: string) => new Date(new Date(eventTime).getTime() - LOCK_MINUTES_BEFORE * 60 * 1000);
-
     const checkLocks = () => {
-        const now = new Date();
-        const raceLockTime = getLockTime(gp.events.quali);
-        setIsRaceLocked(now > raceLockTime);
-
-        if (gp.hasSprint && gp.events.sprintQuali) {
-            const sprintLockTime = getLockTime(gp.events.sprintQuali);
-            setIsSprintLocked(now > sprintLockTime);
-        } else if (gp.hasSprint) {
-            // Fallback for sprint GPs without a specific sprintQuali time: lock with the main quali
-            setIsSprintLocked(now > raceLockTime);
-        }
+        const { isRaceLocked: race, isSprintLocked: sprint } = engine.getLockStatus(gp);
+        setIsRaceLocked(race);
+        setIsSprintLocked(sprint);
     };
 
     checkLocks();

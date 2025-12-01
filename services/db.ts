@@ -1,8 +1,6 @@
-
-
-
 import { User, Team, Driver, GrandPrix, Prediction, OfficialResult, Result, Tournament, Score, SeasonTotal, PointAdjustment, Notification, PokeNotification, TournamentInviteNotification, ResultsNotification, PointsAdjustmentNotification, TournamentInviteAcceptedNotification, TournamentInviteDeclinedNotification, GpScore } from '../types';
 import { TEAMS, DRIVERS, GP_SCHEDULE, SCORING_RULES } from '../constants';
+import { engine } from './engine';
 // FIX: Added firebase compat import for FieldValue operations.
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/firestore';
@@ -129,6 +127,7 @@ export const db = {
 
   // Predictions
   getPrediction: async (userId: string, gpId: number): Promise<Prediction | undefined> => {
+      // FUTURE TODO: Migrate to path structure /predictions/{seasonId}/{gpId}/{userId} for scalability
       const docId = `${userId}_${gpId}`;
       const docRef = predictionsCol.doc(docId);
       const docSnap = await docRef.get();
@@ -258,62 +257,14 @@ export const db = {
 
   // Scoring
   calculateGpScore: async (prediction: Prediction, result: OfficialResult): Promise<GpScore> => {
+    // Fetch necessary context (GP) to pass to engine
     const gp = (await scheduleCol.doc(String(result.gpId)).get()).data() as GrandPrix;
-    
-    const score: GpScore = {
-        gpId: result.gpId,
-        gpName: gp?.name || `GP ${result.gpId}`,
-        totalPoints: 0,
-        breakdown: {
-            pole: 0, sprintPole: 0, sprintPodium: 0,
-            racePodium: 0, fastestLap: 0, driverOfTheDay: 0
-        }
-    };
-
-    if (result.pole && result.pole === prediction.pole) {
-        score.breakdown.pole += SCORING_RULES.pole;
-    }
-    if (result.fastestLap && result.fastestLap === prediction.fastestLap) {
-        score.breakdown.fastestLap += SCORING_RULES.fastestLap;
-    }
-    if (result.driverOfTheDay && result.driverOfTheDay === prediction.driverOfTheDay) {
-        score.breakdown.driverOfTheDay += SCORING_RULES.driverOfTheDay;
-    }
-    if (result.racePodium && prediction.racePodium) {
-        if (result.racePodium[0] === prediction.racePodium[0]) score.breakdown.racePodium += SCORING_RULES.racePodium.p1;
-        if (result.racePodium[1] === prediction.racePodium[1]) score.breakdown.racePodium += SCORING_RULES.racePodium.p2;
-        if (result.racePodium[2] === prediction.racePodium[2]) score.breakdown.racePodium += SCORING_RULES.racePodium.p3;
-        
-        const correctPositions = [prediction.racePodium[0] === result.racePodium[0], prediction.racePodium[1] === result.racePodium[1], prediction.racePodium[2] === result.racePodium[2]];
-        prediction.racePodium.forEach((driverId, index) => {
-            // FIX: Cast tuple to `readonly string[]` to help TypeScript resolve the correct overload for the `includes` method.
-            if (driverId && (result.racePodium as readonly string[]).includes(driverId) && !correctPositions[index]) {
-                score.breakdown.racePodium += SCORING_RULES.racePodium.inPodium;
-            }
-        });
-    }
-    if (result.sprintPole && result.sprintPole === prediction.sprintPole) {
-        score.breakdown.sprintPole += SCORING_RULES.sprintPole;
-    }
-    if (result.sprintPodium && prediction.sprintPodium) {
-        if (result.sprintPodium[0] === prediction.sprintPodium[0]) score.breakdown.sprintPodium += SCORING_RULES.sprintPodium.p1;
-        if (result.sprintPodium[1] === prediction.sprintPodium[1]) score.breakdown.sprintPodium += SCORING_RULES.sprintPodium.p2;
-        if (result.sprintPodium[2] === prediction.sprintPodium[2]) score.breakdown.sprintPodium += SCORING_RULES.sprintPodium.p3;
-
-        const correctSprintPositions = [prediction.sprintPodium[0] === result.sprintPodium[0], prediction.sprintPodium[1] === result.sprintPodium[1], prediction.sprintPodium[2] === result.sprintPodium[2]];
-        prediction.sprintPodium.forEach((driverId, index) => {
-            // FIX: Cast tuple to `readonly string[]` to help TypeScript resolve the correct overload for the `includes` method.
-            if (driverId && (result.sprintPodium as readonly string[]).includes(driverId) && !correctSprintPositions[index]) {
-                score.breakdown.sprintPodium += SCORING_RULES.sprintPodium.inPodium;
-            }
-        });
-    }
-
-    score.totalPoints = Object.values(score.breakdown).reduce((a, b) => a + b, 0);
-    
-    return score;
+    // Delegate logic to engine
+    return engine.calculateGpScore(gp, prediction, result);
   },
+
   calculateSeasonTotals: async (): Promise<SeasonTotal[]> => {
+    // 1. Fetch ALL necessary data from Firestore
     const [usersSnap, predictionsSnap, resultsSnap, adjustmentsSnap] = await Promise.all([
         usersCol.get(),
         predictionsCol.get(),
@@ -327,81 +278,8 @@ export const db = {
     const officialResults = resultsSnap.docs.map(d => d.data() as OfficialResult);
     const pointAdjustments = adjustmentsSnap.docs.map(d => d.data() as PointAdjustment);
 
-    const scores: { [userId: string]: SeasonTotal } = {};
-
-    users.forEach(user => {
-        scores[user.id] = {
-            userId: user.id,
-            userUsername: user.username,
-            userAvatar: user.avatar,
-            totalPoints: 0,
-            details: { exactPole: 0, exactP1: 0, exactFastestLap: 0 },
-            pointAdjustments: [],
-        };
-    });
-
-    officialResults.forEach(result => {
-        const gpPredictions = allPredictions.filter(p => p.gpId === result.gpId);
-        gpPredictions.forEach(pred => {
-            if (!scores[pred.userId]) return;
-
-            let gpPoints = 0;
-
-            if (result.pole && result.pole === pred.pole) {
-                gpPoints += SCORING_RULES.pole;
-                scores[pred.userId].details.exactPole++;
-            }
-            if (result.fastestLap && result.fastestLap === pred.fastestLap) {
-                gpPoints += SCORING_RULES.fastestLap;
-                scores[pred.userId].details.exactFastestLap++;
-            }
-            if (result.driverOfTheDay && result.driverOfTheDay === pred.driverOfTheDay) {
-                gpPoints += SCORING_RULES.driverOfTheDay;
-            }
-            if (result.racePodium && pred.racePodium) {
-                if (result.racePodium[0] === pred.racePodium[0]) {
-                    gpPoints += SCORING_RULES.racePodium.p1;
-                    scores[pred.userId].details.exactP1++;
-                }
-                if (result.racePodium[1] === pred.racePodium[1]) gpPoints += SCORING_RULES.racePodium.p2;
-                if (result.racePodium[2] === pred.racePodium[2]) gpPoints += SCORING_RULES.racePodium.p3;
-                
-                const correctPositions = [pred.racePodium[0] === result.racePodium[0], pred.racePodium[1] === result.racePodium[1], pred.racePodium[2] === result.racePodium[2]];
-                pred.racePodium.forEach((driverId, index) => {
-                    // FIX: Cast to a string array to ensure `includes` method is correctly resolved for the tuple type.
-                    if (driverId && (result.racePodium as readonly string[]).includes(driverId) && !correctPositions[index]) {
-                        gpPoints += SCORING_RULES.racePodium.inPodium;
-                    }
-                });
-            }
-            if (result.sprintPole && result.sprintPole === pred.sprintPole) {
-                gpPoints += SCORING_RULES.sprintPole;
-            }
-            if (result.sprintPodium && pred.sprintPodium) {
-                if (result.sprintPodium[0] === pred.sprintPodium[0]) gpPoints += SCORING_RULES.sprintPodium.p1;
-                if (result.sprintPodium[1] === pred.sprintPodium[1]) gpPoints += SCORING_RULES.sprintPodium.p2;
-                if (result.sprintPodium[2] === pred.sprintPodium[2]) gpPoints += SCORING_RULES.sprintPodium.p3;
-
-                const correctSprintPositions = [pred.sprintPodium[0] === result.sprintPodium[0], pred.sprintPodium[1] === result.sprintPodium[1], pred.sprintPodium[2] === result.sprintPodium[2]];
-                pred.sprintPodium.forEach((driverId, index) => {
-                    // FIX: Cast to a string array to ensure `includes` method is correctly resolved for the tuple type.
-                    if (driverId && (result.sprintPodium as readonly string[]).includes(driverId) && !correctSprintPositions[index]) {
-                        gpPoints += SCORING_RULES.sprintPodium.inPodium;
-                    }
-                });
-            }
-            scores[pred.userId].totalPoints += gpPoints;
-        });
-    });
-    
-    pointAdjustments.forEach(adj => {
-        if (scores[adj.userId]) {
-            scores[adj.userId].totalPoints += adj.points;
-            scores[adj.userId].pointAdjustments?.push(adj);
-        }
-    });
-
-    return Object.values(scores).sort((a, b) => b.totalPoints - a.totalPoints);
+    // 2. Pass data to engine for pure calculation
+    return engine.calculateSeasonStandings(users, allPredictions, officialResults, pointAdjustments);
   },
 
   // Tournaments
