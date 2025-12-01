@@ -1,27 +1,30 @@
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import CookieConsent from './components/common/CookieConsent';
-import HomePage from './pages/HomePage';
-import PredictionsPage from './pages/PredictionsPage';
-import TournamentsPage from './pages/TournamentsPage';
-import ProfilePage from './pages/ProfilePage';
-import AdminPage from './pages/AdminPage';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import SearchPage from './pages/SearchPage';
-import ResultsReviewPage from './pages/ResultsReviewPage';
-import HowToPlayPage from './pages/HowToPlayPage';
-import EmailVerificationPage from './pages/EmailVerificationPage';
+import LoadingSpinner from './components/common/LoadingSpinner';
+
+// Lazy Load Pages to improve initial bundle size
+const HomePage = React.lazy(() => import('./pages/HomePage'));
+const PredictionsPage = React.lazy(() => import('./pages/PredictionsPage'));
+const TournamentsPage = React.lazy(() => import('./pages/TournamentsPage'));
+const ProfilePage = React.lazy(() => import('./pages/ProfilePage'));
+const AdminPage = React.lazy(() => import('./pages/AdminPage'));
+const LoginPage = React.lazy(() => import('./pages/LoginPage'));
+const RegisterPage = React.lazy(() => import('./pages/RegisterPage'));
+const SearchPage = React.lazy(() => import('./pages/SearchPage'));
+const ResultsReviewPage = React.lazy(() => import('./pages/ResultsReviewPage'));
+const HowToPlayPage = React.lazy(() => import('./pages/HowToPlayPage'));
+const EmailVerificationPage = React.lazy(() => import('./pages/EmailVerificationPage'));
 
 const PrivateRoute: React.FC<{ children: React.ReactNode, adminOnly?: boolean }> = ({ children, adminOnly = false }) => {
     const { user, loading } = useAuth();
 
     if (loading) {
-        return <div className="text-center p-8">Verificando autenticación...</div>;
+        return <LoadingSpinner />;
     }
 
     if (!user) {
@@ -40,32 +43,34 @@ const App: React.FC = () => {
         <HashRouter>
             <div className="min-h-screen bg-[var(--background-dark)] text-[var(--text-primary)] flex flex-col">
                 <Header />
-                <main className="flex-grow">
-                    <Routes>
-                        <Route path="/" element={<HomePage />} />
-                        <Route path="/login" element={<LoginPage />} />
-                        <Route path="/register" element={<RegisterPage />} />
-                        <Route path="/verify-email" element={<EmailVerificationPage />} />
-                        <Route path="/search" element={<SearchPage />} />
-                        <Route path="/profile/:userId" element={<ProfilePage />} />
-                        <Route path="/how-to-play" element={<HowToPlayPage />} />
-                        
-                        <Route path="/predict/:gpId" element={
-                            <PrivateRoute><PredictionsPage /></PrivateRoute>
-                        } />
-                        <Route path="/tournaments" element={
-                            <PrivateRoute><TournamentsPage /></PrivateRoute>
-                        } />
-                         <Route path="/results/:userId/:gpId" element={
-                            <PrivateRoute><ResultsReviewPage /></PrivateRoute>
-                        } />
+                <main className="flex-grow flex flex-col">
+                    <Suspense fallback={<LoadingSpinner />}>
+                        <Routes>
+                            <Route path="/" element={<HomePage />} />
+                            <Route path="/login" element={<LoginPage />} />
+                            <Route path="/register" element={<RegisterPage />} />
+                            <Route path="/verify-email" element={<EmailVerificationPage />} />
+                            <Route path="/search" element={<SearchPage />} />
+                            <Route path="/profile/:userId" element={<ProfilePage />} />
+                            <Route path="/how-to-play" element={<HowToPlayPage />} />
+                            
+                            <Route path="/predict/:gpId" element={
+                                <PrivateRoute><PredictionsPage /></PrivateRoute>
+                            } />
+                            <Route path="/tournaments" element={
+                                <PrivateRoute><TournamentsPage /></PrivateRoute>
+                            } />
+                             <Route path="/results/:userId/:gpId" element={
+                                <PrivateRoute><ResultsReviewPage /></PrivateRoute>
+                            } />
 
-                        <Route path="/admin" element={
-                            <PrivateRoute adminOnly={true}><AdminPage /></PrivateRoute>
-                        } />
+                            <Route path="/admin" element={
+                                <PrivateRoute adminOnly={true}><AdminPage /></PrivateRoute>
+                            } />
 
-                        <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
+                            <Route path="*" element={<Navigate to="/" replace />} />
+                        </Routes>
+                    </Suspense>
                 </main>
                 <Footer />
                 <CookieConsent />
