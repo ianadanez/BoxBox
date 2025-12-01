@@ -3,6 +3,24 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import { firestoreDb } from '../firebaseConfig';
 
 /**
+ * FOR DEBUGGING: Fetches all season documents from the database.
+ * @returns {Promise<any[]>} A promise that resolves to an array of season data.
+ */
+export const debugGetAllSeasons = async (): Promise<any[]> => {
+  console.log('DEBUG: Fetching all seasons...');
+  const seasonsCollection = collection(firestoreDb, 'seasons');
+  try {
+    const querySnapshot = await getDocs(seasonsCollection);
+    const seasons = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    console.log('DEBUG: All seasons found:', seasons);
+    return seasons;
+  } catch (error) {
+    console.error("DEBUG: Error fetching all seasons:", error);
+    return [];
+  }
+};
+
+/**
  * Determines if the current date falls outside of any active season.
  * @returns {Promise<boolean>} A promise that resolves to true if it is off-season, false otherwise.
  */

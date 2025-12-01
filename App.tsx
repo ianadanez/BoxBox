@@ -6,7 +6,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import CookieConsent from './components/common/CookieConsent';
 import LoadingSpinner from './components/common/LoadingSpinner';
-import { checkIsOffSeason } from './services/seasonService'; // Import the service
+import { checkIsOffSeason, debugGetAllSeasons } from './services/seasonService'; // Import the debug service
 
 // Lazy Load Pages
 const HomePage = React.lazy(() => import('./pages/HomePage'));
@@ -36,6 +36,8 @@ const AppRoutes: React.FC = () => {
 
     useEffect(() => {
         const determineSeasonStatus = async () => {
+            // DEBUG: Log all seasons to the console
+            await debugGetAllSeasons();
             const offSeasonStatus = await checkIsOffSeason();
             setIsOffSeason(offSeasonStatus);
         };
