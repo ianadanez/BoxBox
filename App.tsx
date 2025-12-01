@@ -1,13 +1,19 @@
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import CookieConsent from './components/common/CookieConsent';
 import LoadingSpinner from './components/common/LoadingSpinner';
+import { checkIsOffSeason } from './services/seasonService';
 
-// Lazy Load Pages to improve initial bundle size
+// =========================================================================================
+// TEMPORARY MIGRATION - This will be removed after execution
+import { runTempMigration } from './temp-migration';
+// =========================================================================================
+
+// Lazy Load Pages
 const HomePage = React.lazy(() => import('./pages/HomePage'));
 const PredictionsPage = React.lazy(() => import('./pages/PredictionsPage'));
 const TournamentsPage = React.lazy(() => import('./pages/TournamentsPage'));
@@ -19,65 +25,56 @@ const SearchPage = React.lazy(() => import('./pages/SearchPage'));
 const ResultsReviewPage = React.lazy(() => import('./pages/ResultsReviewPage'));
 const HowToPlayPage = React.lazy(() => import('./pages/HowToPlayPage'));
 const EmailVerificationPage = React.lazy(() => import('./pages/EmailVerificationPage'));
-const OffSeasonPage = React.lazy(() => import('./pages/OffSeasonPage')); // Import the new page
+const OffSeasonPage = React.lazy(() => import('./pages/OffSeasonPage'));
 
 const PrivateRoute: React.FC<{ children: React.ReactNode, adminOnly?: boolean }> = ({ children, adminOnly = false }) => {
     const { user, loading } = useAuth();
-
-    if (loading) {
-        return <LoadingSpinner />;
-    }
-
-    if (!user) {
-        return <Navigate to="/login" replace />;
-    }
-    if (adminOnly && user.role !== 'admin') {
-         return <Navigate to="/" replace />;
-    }
+    if (loading) return <LoadingSpinner />;
+    if (!user) return <Navigate to="/login" replace />;
+    if (adminOnly && user.role !== 'admin') return <Navigate to="/" replace />;
     return <>{children}</>;
 };
 
-// This component will act as our "Traffic Cop"
 const AppRoutes: React.FC = () => {
-    
-    // For now, we will hardcode this to 'true' to test the OffSeasonPage.
-    // Later, this will be replaced with real logic based on race dates.
-    const isOffSeason = true;
+    const [isOffSeason, setIsOffSeason] = useState<boolean | null>(null);
+
+    useEffect(() => {
+        const determineSeasonStatus = async () => {
+            const offSeasonStatus = await checkIsOffSeason();
+            setIsOffSeason(offSeasonStatus);
+        };
+        determineSeasonStatus();
+    }, []);
+
+    if (isOffSeason === null) {
+        return <LoadingSpinner />;
+    }
 
     return (
         <Routes>
-            {/* If it's the off-season, the root path shows the OffSeasonPage */}
             <Route path="/" element={isOffSeason ? <OffSeasonPage /> : <HomePage />} />
-            
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/verify-email" element={<EmailVerificationPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/profile/:userId" element={<ProfilePage />} />
             <Route path="/how-to-play" element={<HowToPlayPage />} />
-            
-            {/* Other routes remain accessible directly */}
-            <Route path="/predict/:gpId" element={
-                <PrivateRoute><PredictionsPage /></PrivateRoute>
-            } />
-            <Route path="/tournaments" element={
-                <PrivateRoute><TournamentsPage /></PrivateRoute>
-            } />
-             <Route path="/results/:userId/:gpId" element={
-                <PrivateRoute><ResultsReviewPage /></PrivateRoute>
-            } />
-
-            <Route path="/admin" element={
-                <PrivateRoute adminOnly={true}><AdminPage /></PrivateRoute>
-            } />
-
-            {/* Any unknown path redirects to the main page */}
+            <Route path="/predict/:gpId" element={<PrivateRoute><PredictionsPage /></PrivateRoute>} />
+            <Route path="/tournaments" element={<PrivateRoute><TournamentsPage /></PrivateRoute>} />
+            <Route path="/results/:userId/:gpId" element={<PrivateRoute><ResultsReviewPage /></PrivateRoute>} />
+            <Route path="/admin" element={<PrivateRoute adminOnly={true}><AdminPage /></PrivateRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
     );
 }
 
 const App: React.FC = () => {
+  
+  // Run the temporary migration once on app load.
+  useEffect(() => {
+    runTempMigration();
+  }, []);
+
   return (
     <AuthProvider>
         <HashRouter>
