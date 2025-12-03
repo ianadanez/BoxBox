@@ -13,20 +13,17 @@ import { firestoreDb as firestore } from '../firebaseConfig';
 
 
 // --- Top-Level Collection References (Non-Seasonal)---
-// FIX: Use compat API for collection references.
 const usersCol = firestore.collection('users');
-const teamsCol = firestore.collection('teams');
-const driversCol = firestore.collection('drivers');
 const notificationsCol = firestore.collection('notifications');
 
 // --- SEASON-AWARE HELPER ---
 /**
  * A helper function to get a reference to a collection within the active season.
  * This is the core of our multi-season architecture.
- * @param collectionName The name of the subcollection (e.g., 'schedule', 'predictions').
+ * @param collectionName The name of the subcollection (e.g., 'schedule', 'teams').
  * @returns A CollectionReference or null if no season is active.
  */
-const getSeasonCollection = async (collectionName: 'schedule' | 'predictions' | 'results' | 'tournaments' | 'pointAdjustments' | 'draft_results') => {
+const getSeasonCollection = async (collectionName: 'schedule' | 'predictions' | 'results' | 'tournaments' | 'pointAdjustments' | 'draft_results' | 'teams' | 'drivers') => {
     const seasonId = await getActiveSeason();
     if (!seasonId) {
         console.warn(`No active season found. Cannot access collection '${collectionName}'.`);
@@ -85,22 +82,28 @@ export const db = {
       await docRef.set(user, { merge: true });
   },
 
-  // Catalogue (Unaffected by seasons)
+  // --- SEASONAL DATA ---
+
+  // Catalogue (Now Season-Aware)
   getTeams: async (): Promise<Team[]> => {
+      const teamsCol = await getSeasonCollection('teams');
+      if (!teamsCol) return [];
       const snapshot = await teamsCol.get();
       return snapshot.docs.map(doc => doc.data() as Team);
   },
   getDrivers: async (activeOnly = false): Promise<Driver[]> => {
+      const driversCol = await getSeasonCollection('drivers');
+      if (!driversCol) return [];
       const q = activeOnly ? driversCol.where("isActive", "==", true) : driversCol;
       const snapshot = await q.get();
       return snapshot.docs.map(doc => doc.data() as Driver);
   },
   saveDriver: async (driver: Driver): Promise<void> => {
+      const driversCol = await getSeasonCollection('drivers');
+      if (!driversCol) return;
       const docRef = driversCol.doc(driver.id);
       await docRef.set(driver, { merge: true });
   },
-
-  // --- SEASONAL DATA ---
 
   // Schedule
   getSchedule: async (): Promise<GrandPrix[]> => {
@@ -343,7 +346,7 @@ export const db = {
       await tournamentRef.delete();
   },
 
-  // Notifications & Invites (Largely unaffected, but invite logic needs to be season-aware for tournament creation/joining)
+  // Notifications & Invites
   listenForNotificationsForUser: (userId: string, onUpdate: (notifications: Notification[]) => void): () => void => {
       const q = notificationsCol.where("toUserId", "==", userId).limit(30);
       const unsubscribe = q.onSnapshot(snapshot => {
@@ -503,7 +506,7 @@ export const db = {
       }
 
       // 1. Clear non-seasonal data
-      const collectionsToClear = [teamsCol, driversCol, notificationsCol];
+      const collectionsToClear = [usersCol, notificationsCol]; // Removed teamsCol, driversCol
       for (const col of collectionsToClear) {
           const snapshot = await col.get();
           if (snapshot.empty) continue;
@@ -514,7 +517,7 @@ export const db = {
       }
       
       // 2. Clear seasonal data from the active season
-      const seasonalCollections = ['schedule', 'predictions', 'results', 'tournaments', 'pointAdjustments'];
+      const seasonalCollections = ['schedule', 'predictions', 'results', 'tournaments', 'pointAdjustments', 'teams', 'drivers']; // Added teams, drivers
       for (const name of seasonalCollections) {
           const coll = firestore.collection(`seasons/${seasonId}/${name}`);
           const snapshot = await coll.get();
@@ -525,19 +528,18 @@ export const db = {
           console.log(`Cleared seasonal collection: seasons/${seasonId}/${name}`);
       }
 
-      // 3. Seed non-seasonal data
-      const seedBatch = firestore.batch();
-      TEAMS.forEach(team => seedBatch.set(teamsCol.doc(team.id), team));
-      DRIVERS.forEach(driver => seedBatch.set(driversCol.doc(driver.id), driver));
-      await seedBatch.commit();
-      console.log("Seeded Teams and Drivers.");
-
-      // 4. Seed seasonal data into the active season
+      // 3. Seed seasonal data into the active season
       const seasonSeedBatch = firestore.batch();
       const scheduleCol = firestore.collection(`seasons/${seasonId}/schedule`);
+      const teamsCol = firestore.collection(`seasons/${seasonId}/teams`);
+      const driversCol = firestore.collection(`seasons/${seasonId}/drivers`);
+
       GP_SCHEDULE.forEach(gp => seasonSeedBatch.set(scheduleCol.doc(String(gp.id)), gp));
+      TEAMS.forEach(team => seasonSeedBatch.set(teamsCol.doc(team.id), team));
+      DRIVERS.forEach(driver => seasonSeedBatch.set(driversCol.doc(driver.id), driver));
+      
       await seasonSeedBatch.commit();
-      console.log(`Seeded Schedule into season ${seasonId}.`);
+      console.log(`Seeded Schedule, Teams, and Drivers into season ${seasonId}.`);
 
       console.log("NOTE: Test users (e.g., admin@boxbox.com) must be created manually in the Firebase Authentication console.");
       console.log("Firebase seed complete.");
