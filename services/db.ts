@@ -1,9 +1,9 @@
 
-import { User, Team, Driver, GrandPrix, Prediction, OfficialResult, Result, Tournament, GpScore, SeasonTotal, PointAdjustment, Notification, ResultsNotification, TournamentInviteNotification, TournamentInviteAcceptedNotification, TournamentInviteDeclinedNotification, PokeNotification, PointsAdjustmentNotification } from '../types';
+import { User, Team, Driver, GrandPrix, Prediction, OfficialResult, Result, Tournament, GpScore, SeasonTotal, PointAdjustment, Notification, ResultsNotification, TournamentInviteNotification, TournamentInviteAcceptedNotification, TournamentInviteDeclinedNotification, PokeNotification, PointsAdjustmentNotification, Season } from '../types';
 import { TEAMS, DRIVERS, GP_SCHEDULE } from '../constants';
 import { engine } from './engine';
-// Import the new season service
-import { getActiveSeason } from './seasonService';
+// Import the season service functions
+import { getActiveSeason, clearActiveSeasonCache } from './seasonService';
 
 // FIX: Added firebase compat import for FieldValue operations.
 import firebase from 'firebase/compat/app';
@@ -12,9 +12,11 @@ import 'firebase/compat/firestore';
 import { firestoreDb as firestore } from '../firebaseConfig';
 
 
-// --- Top-Level Collection References (Non-Seasonal)---
+// --- Top-Level Collection References ---
 const usersCol = firestore.collection('users');
 const notificationsCol = firestore.collection('notifications');
+const seasonsCol = firestore.collection('seasons'); // New collection ref
+
 
 // --- SEASON-AWARE HELPER ---
 /**
@@ -80,6 +82,63 @@ export const db = {
   saveUser: async (user: User): Promise<void> => {
       const docRef = usersCol.doc(user.id);
       await docRef.set(user, { merge: true });
+  },
+
+  // --- SEASON MANAGEMENT ---
+  listSeasons: async (): Promise<Season[]> => {
+      const snapshot = await seasonsCol.orderBy('id', 'desc').get();
+      return snapshot.docs.map(doc => doc.data() as Season);
+  },
+
+  switchActiveSeason: async (seasonId: string): Promise<void> => {
+      const batch = firestore.batch();
+      
+      // 1. Set all seasons to inactive
+      const allSeasonsSnap = await seasonsCol.get();
+      allSeasonsSnap.forEach(doc => {
+          batch.update(doc.ref, { isActive: false });
+      });
+
+      // 2. Set the target season to active
+      const newActiveSeasonRef = seasonsCol.doc(seasonId);
+      batch.update(newActiveSeasonRef, { isActive: true });
+
+      // 3. Commit and clear cache
+      await batch.commit();
+      clearActiveSeasonCache();
+      console.log(`Switched active season to ${seasonId}`);
+  },
+
+  createNewSeason: async (seasonId: string): Promise<void> => {
+      const newSeasonRef = seasonsCol.doc(seasonId);
+      const doc = await newSeasonRef.get();
+
+      if (doc.exists) {
+          throw new Error(`Season ${seasonId} already exists!`);
+      }
+
+      console.log(`Creating new season ${seasonId}...`);
+      const batch = firestore.batch();
+
+      // 1. Create the season document
+      const newSeasonData: Season = {
+          id: seasonId,
+          name: `Formula 1 Season ${seasonId}`,
+          isActive: false, // It's not active by default
+      };
+      batch.set(newSeasonRef, newSeasonData);
+
+      // 2. Seed the new season with default data
+      const scheduleCol = firestore.collection(`seasons/${seasonId}/schedule`);
+      const teamsCol = firestore.collection(`seasons/${seasonId}/teams`);
+      const driversCol = firestore.collection(`seasons/${seasonId}/drivers`);
+
+      GP_SCHEDULE.forEach(gp => batch.set(scheduleCol.doc(String(gp.id)), gp));
+      TEAMS.forEach(team => batch.set(teamsCol.doc(team.id), team));
+      DRIVERS.forEach(driver => batch.set(driversCol.doc(driver.id), driver));
+
+      await batch.commit();
+      console.log(`Successfully created and seeded season ${seasonId}.`);
   },
 
   // --- SEASONAL DATA ---
@@ -462,7 +521,7 @@ export const db = {
       const q = notificationsCol
           .where("fromUserId", "==", fromUserId)
           .where("toUserId", "==", toUserId)
-          .where("type", "==", "poke")
+          .where("type", "===", "poke")
           .where("seen", "==", false)
           .limit(1);
       const snapshot = await q.get();

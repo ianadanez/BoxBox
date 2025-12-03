@@ -1,69 +1,42 @@
 
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { firestoreDb } from '../firebaseConfig';
+import { firestore } from '../firebaseConfig'; // Assuming compat
 
-// Keep a cached version of the active season to avoid repeated Firestore queries
-// within the same user session.
-let activeSeasonCache: string | null = null;
+let activeSeasonId: string | null = null;
+let lastFetchTime: number = 0;
+const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
 
 /**
- * Gets the ID of the currently active season.
- * It queries the 'seasons' collection for a document with status 'active'
- * and where the current date is within the season's start and end dates.
- * Results are cached for the session to improve performance.
- * @returns {Promise<string | null>} A promise that resolves to the active season ID (e.g., "2025") or null if none is active.
+ * Gets the active season ID, using a short-lived cache to reduce Firestore reads.
+ * This is crucial for performance as it's called by almost every data-fetching function.
  */
 export const getActiveSeason = async (): Promise<string | null> => {
-  // Return the cached value if available
-  if (activeSeasonCache) {
-    console.log(`Returning cached active season: ${activeSeasonCache}`);
-    return activeSeasonCache;
-  }
-
-  console.log('Querying for active season...');
-  const today = new Date().toISOString().split('T')[0]; // Get date in YYYY-MM-DD format
-
-  const seasonsCollection = collection(firestoreDb, 'seasons');
-  const q = query(
-    seasonsCollection,
-    where('startDate', '<=', today),
-    where('endDate', '>=', today),
-    where('status', '==', 'active')
-  );
-
-  try {
-    const querySnapshot = await getDocs(q);
-
-    if (querySnapshot.empty) {
-      console.warn('No active season found for the current date.');
-      return null;
-    } else {
-      // It's possible to have more than one active season if data is not clean,
-      // but we'll take the first one.
-      const seasonDoc = querySnapshot.docs[0];
-      const seasonId = seasonDoc.id;
-      console.log(`Active season found: ${seasonId}.`);
-      
-      // Cache the result
-      activeSeasonCache = seasonId;
-      return seasonId;
+    const now = Date.now();
+    if (activeSeasonId && (now - lastFetchTime < CACHE_DURATION)) {
+        return activeSeasonId;
     }
-  } catch (error) {
-    console.error("Error fetching active season:", error);
-    // In case of error, we return null and don't block the app.
-    return null;
-  }
+
+    console.log("Fetching active season from Firestore...");
+    const q = firestore.collection('seasons').where('isActive', '==', true).limit(1);
+    const snapshot = await q.get();
+    
+    if (snapshot.empty) {
+        console.warn("No active season found in 'seasons' collection.");
+        activeSeasonId = null;
+    } else {
+        activeSeasonId = snapshot.docs[0].id;
+        console.log(`Active season set to: ${activeSeasonId}`);
+    }
+    
+    lastFetchTime = now;
+    return activeSeasonId;
 };
 
-
 /**
- * Determines if the current date falls outside of any active season.
- * @returns {Promise<boolean>} A promise that resolves to true if it is off-season, false otherwise.
+ * Clears the cached active season ID.
+ * This should be called after an operation that changes the active season.
  */
-export const checkIsOffSeason = async (): Promise<boolean> => {
-  const seasonId = await getActiveSeason();
-  // If getActiveSeason returns null, it's off-season. Otherwise, it's in-season.
-  const isOffSeason = seasonId === null;
-  console.log(`checkIsOffSeason result: ${isOffSeason}`);
-  return isOffSeason;
+export const clearActiveSeasonCache = (): void => {
+    console.log("Active season cache cleared.");
+    activeSeasonId = null;
+    lastFetchTime = 0;
 };
