@@ -5,7 +5,8 @@ import { SeasonTotal, Avatar as AvatarType, GrandPrix, Driver, OfficialResult, U
 import { db } from '../services/db';
 import { engine } from '../services/engine';
 import { useAuth } from '../contexts/AuthContext';
-import StandingsTable from '../components/common/StandingsTable';
+// TODO: El componente StandingsTable fue eliminado. Debe ser recreado para la OffSeasonPage.
+// import StandingsTable from '../components/common/StandingsTable';
 import Avatar from '../components/common/Avatar';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import Confetti from 'react-confetti';
@@ -257,7 +258,9 @@ const OffSeasonPage: React.FC<OffSeasonPageProps> = ({ seasonYear }) => {
                     {error && <div className="p-4 my-4 text-center text-red-400 bg-red-900/30 rounded-lg">{error}</div>}
 
                     {viewMode === 'season' && (
-                        <StandingsTable title={`Clasificación General ${seasonYear}`} standings={seasonStandings} />
+                        // TODO: Reactivar cuando el componente StandingsTable esté listo.
+                        // <StandingsTable title={`Clasificación General ${seasonYear}`} standings={seasonStandings} />
+                        <p className="text-center text-gray-400">La tabla de clasificación general se mostrará aquí.</p>
                     )}
 
                     {viewMode === 'gp' && (
@@ -272,12 +275,15 @@ const OffSeasonPage: React.FC<OffSeasonPageProps> = ({ seasonYear }) => {
                                         <ResultCard title="Vuelta Rápida" driverId={officialResult.fastestLap} drivers={drivers} />
                                         <ResultCard title="Piloto del Día" driverId={officialResult.dotd} drivers={drivers} />
                                     </div>
+                                    {/* TODO: Reactivar cuando el componente StandingsTable esté listo.
                                     <StandingsTable 
                                         title={`Clasificación de Jugadores - ${schedule.find(g => g.id.toString() === selectedGpId)?.name}`}
                                         standings={gpStandings}
                                         actionButtonLabel="Ver Predicción"
                                         onActionClick={(item) => setViewingPredictionFor(item)}
                                     />
+                                    */}
+                                     <p className="text-center text-gray-400">La tabla de clasificación del GP se mostrará aquí.</p>
                                 </div>
                             )}
                             {!loadingRaceData && !officialResult && selectedGpId && <p className="text-center mt-8 text-gray-400">No hay resultados disponibles para esta carrera todavía.</p>}
