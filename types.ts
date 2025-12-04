@@ -2,7 +2,7 @@
 export interface Season {
   id: string; // e.g., "2025", "2026"
   name: string; // e.g., "Formula 1 Season 2025"
-  isActive: boolean;
+  status: 'active' | 'inactive';
 }
 
 export interface User {

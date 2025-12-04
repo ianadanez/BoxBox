@@ -23,6 +23,13 @@ service cloud.firestore {
 
     // --- Collections ---
 
+    // SEASONS:
+    // Publicly readable, only admins can write.
+    match /seasons/{seasonId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // USERS:
     // Anyone signed in can read users (for leaderboards/search).
     // Only the user themselves or an admin can edit the profile.
@@ -32,53 +39,49 @@ service cloud.firestore {
     }
 
     // TEAMS & DRIVERS & SCHEDULE:
-    // Publicly readable. Only admins can write.
-    match /teams/{teamId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-    match /drivers/{driverId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-    match /schedule/{gpId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
+    // These are now subcollections of a season. Rules need to be nested.
+    // This is handled by the season-specific rule below.
 
     // PREDICTIONS:
     // Users can read any prediction (open game).
     // Users can only write their own prediction.
-    // The 'gpId' part of the ID isn't easily checked here without parsing, 
-    // so we rely on the rule `request.resource.data.userId == request.auth.uid`.
-    match /predictions/{predictionId} {
+    match /seasons/{seasonId}/predictions/{predictionId} {
       allow read: if isSignedIn();
       allow create, update: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      // Allow admins to delete or modify if strictly necessary (optional)
       allow delete: if isAdmin();
     }
 
     // RESULTS & DRAFT_RESULTS:
     // Publicly readable (official). Drafts only for admins.
-    match /results/{gpId} {
+    match /seasons/{seasonId}/results/{gpId} {
       allow read: if true;
       allow write: if isAdmin();
     }
-    match /draft_results/{gpId} {
+    match /seasons/{seasonId}/draft_results/{gpId} {
       allow read, write: if isAdmin();
     }
 
     // TOURNAMENTS:
-    // Authenticated users can read tournaments.
-    // Logic for joining/leaving is complex, initially allowing authenticated write
-    // to support the arrayUnion/arrayRemove logic. 
-    // In a stricter version, we would verify the user is adding THEMSELVES to the array.
-    match /tournaments/{tournamentId} {
+    match /seasons/{seasonId}/tournaments/{tournamentId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn(); 
       allow delete: if isSignedIn() && (resource.data.creatorId == request.auth.uid || isAdmin());
     }
+
+    // POINT ADJUSTMENTS:
+    match /seasons/{seasonId}/pointAdjustments/{adjId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // SEASONAL CATALOGUE (Teams, Drivers, Schedule)
+    match /seasons/{seasonId}/{collection}/{docId} {
+        allow read: if true;
+        allow write: if isAdmin();
+    }
+
+    // --- Root Level Collections (Non-Seasonal) ---
 
     // NOTIFICATIONS:
     // Users can only read/write their own notifications.
@@ -86,13 +89,6 @@ service cloud.firestore {
       allow read: if isSignedIn() && (resource.data.toUserId == request.auth.uid || resource.data.fromUserId == request.auth.uid);
       allow create: if isSignedIn(); // Users create notifications (pokes, invites) for others
       allow update, delete: if isSignedIn() && resource.data.toUserId == request.auth.uid;
-    }
-
-    // POINT ADJUSTMENTS:
-    // Public read (transparency), Admin write only.
-    match /pointAdjustments/{adjId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
     }
   }
 }

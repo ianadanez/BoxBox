@@ -8,8 +8,8 @@ import { getActiveSeason, clearActiveSeasonCache } from './seasonService';
 // FIX: Added firebase compat import for FieldValue operations.
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/firestore';
-// FIX: Updated firebase config now provides compat instances.
-import { firestoreDb as firestore } from '../firebaseConfig';
+// FIX: Corrected the import to match the export from firebaseConfig.ts
+import { firestore } from '../firebaseConfig';
 
 
 // --- Top-Level Collection References ---
@@ -86,7 +86,7 @@ export const db = {
 
   // --- SEASON MANAGEMENT ---
   listSeasons: async (): Promise<Season[]> => {
-      const snapshot = await seasonsCol.orderBy('id', 'desc').get();
+      const snapshot = await seasonsCol.get();
       return snapshot.docs.map(doc => doc.data() as Season);
   },
 
@@ -96,12 +96,12 @@ export const db = {
       // 1. Set all seasons to inactive
       const allSeasonsSnap = await seasonsCol.get();
       allSeasonsSnap.forEach(doc => {
-          batch.update(doc.ref, { isActive: false });
+          batch.update(doc.ref, { status: 'inactive' });
       });
 
       // 2. Set the target season to active
       const newActiveSeasonRef = seasonsCol.doc(seasonId);
-      batch.update(newActiveSeasonRef, { isActive: true });
+      batch.update(newActiveSeasonRef, { status: 'active' });
 
       // 3. Commit and clear cache
       await batch.commit();
@@ -124,7 +124,7 @@ export const db = {
       const newSeasonData: Season = {
           id: seasonId,
           name: `Formula 1 Season ${seasonId}`,
-          isActive: false, // It's not active by default
+          status: 'inactive', // It's not active by default
       };
       batch.set(newSeasonRef, newSeasonData);
 
@@ -521,7 +521,7 @@ export const db = {
       const q = notificationsCol
           .where("fromUserId", "==", fromUserId)
           .where("toUserId", "==", toUserId)
-          .where("type", "===", "poke")
+          .where("type", "==", "poke") // FIX: Changed === to ==
           .where("seen", "==", false)
           .limit(1);
       const snapshot = await q.get();

@@ -16,7 +16,8 @@ export const getActiveSeason = async (): Promise<string | null> => {
     }
 
     console.log("Fetching active season from Firestore...");
-    const q = firestore.collection('seasons').where('isActive', '==', true).limit(1);
+    // FIX: Changed the query to match the database schema (`status: "active"` instead of `isActive: true`).
+    const q = firestore.collection('seasons').where('status', '==', 'active').limit(1);
     const snapshot = await q.get();
     
     if (snapshot.empty) {
@@ -39,4 +40,13 @@ export const clearActiveSeasonCache = (): void => {
     console.log("Active season cache cleared.");
     activeSeasonId = null;
     lastFetchTime = 0;
+};
+
+/**
+ * Checks if the application is currently in an "off-season" state.
+ * @returns {Promise<boolean>} True if no active season is found, false otherwise.
+ */
+export const checkIsOffSeason = async (): Promise<boolean> => {
+    const seasonId = await getActiveSeason();
+    return seasonId === null;
 };

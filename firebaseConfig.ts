@@ -12,6 +12,13 @@ import 'firebase/compat/functions';
 // Fix for TypeScript error: Property 'env' does not exist on type 'ImportMeta'.
 const env = (import.meta as any).env;
 
+// !! DIAGNOSTIC LOG !!
+console.log("Firebase Config Vars:", {
+  apiKey: env.VITE_FIREBASE_API_KEY,
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: env.VITE_FIREBASE_PROJECT_ID,
+});
+
 const firebaseConfig = {
   apiKey: env.VITE_FIREBASE_API_KEY,
   authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -29,10 +36,10 @@ if (!firebase.apps.length) {
 
 export const app = firebase.app();
 export const auth = firebase.auth();
-export const firestoreDb = firebase.firestore();
+export const firestore = firebase.firestore(); // FIX: Changed export name to 'firestore' to match db.ts
 
 // Enable persistence
-firestoreDb.enablePersistence().catch((err) => {
+firestore.enablePersistence().catch((err) => {
     if (err.code === 'failed-precondition') {
         console.warn('Firebase persistence failed: failed-precondition. Multiple tabs open?');
     } else if (err.code === 'unimplemented') {
