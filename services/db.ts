@@ -91,22 +91,19 @@ export const db = {
   },
 
   switchActiveSeason: async (seasonId: string): Promise<void> => {
-      const batch = firestore.batch();
-      
-      // 1. Set all seasons to inactive
-      const allSeasonsSnap = await seasonsCol.get();
-      allSeasonsSnap.forEach(doc => {
-          batch.update(doc.ref, { status: 'inactive' });
-      });
+    const batch = firestore.batch();
+    
+    const allSeasonsSnap = await seasonsCol.get();
+    allSeasonsSnap.forEach(doc => {
+        batch.update(doc.ref, { status: 'inactive' });
+    });
 
-      // 2. Set the target season to active
-      const newActiveSeasonRef = seasonsCol.doc(seasonId);
-      batch.update(newActiveSeasonRef, { status: 'active' });
+    const newActiveSeasonRef = seasonsCol.doc(seasonId);
+    batch.set(newActiveSeasonRef, { id: seasonId, status: 'active' }, { merge: true });
 
-      // 3. Commit and clear cache
-      await batch.commit();
-      clearActiveSeasonCache();
-      console.log(`Switched active season to ${seasonId}`);
+    await batch.commit();
+    clearActiveSeasonCache();
+    console.log(`Switched active season to ${seasonId}`);
   },
 
   createNewSeason: async (seasonId: string): Promise<void> => {
