@@ -817,4 +817,122 @@ export const db = {
       await batch.commit();
       return standings.length;
   },
+
+  /**
+   * Importa calendario, equipos y pilotos desde la API Ergast para una temporada dada.
+   * Pensado como importador rápido anual desde el panel admin.
+   */
+  importSeasonDataFromErgast: async (seasonId: string): Promise<void> => {
+      const base = `https://ergast.com/api/f1/${seasonId}`;
+      const fetchJson = async (url: string) => {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`Fallo al obtener ${url}: ${res.status}`);
+          return res.json();
+      };
+
+      const toIso = (date?: string, time?: string) => {
+          if (!date) return '';
+          const t = time || '12:00:00Z';
+          return new Date(`${date}T${t}`).toISOString();
+      };
+
+      // Schedule
+      const scheduleData = await fetchJson(`${base}.json`);
+      const races = scheduleData?.MRData?.RaceTable?.Races || [];
+      const schedule: GrandPrix[] = races.map((r: any) => ({
+          id: parseInt(r.round, 10),
+          name: r.raceName,
+          country: r.Circuit?.Location?.country || '',
+          track: r.Circuit?.circuitName || '',
+          hasSprint: !!r.Sprint,
+          events: {
+              quali: toIso(r.Qualifying?.date, r.Qualifying?.time) || toIso(r.date, r.time),
+              sprintQuali: r.Sprint ? toIso(r.Sprint.date, r.Sprint.time) : undefined,
+              sprint: r.Sprint ? toIso(r.Sprint.date, r.Sprint.time) : undefined,
+              race: toIso(r.date, r.time),
+          },
+      })).sort((a: GrandPrix, b: GrandPrix) => a.id - b.id);
+
+      // Teams
+      const constructorsData = await fetchJson(`${base}/constructors.json`);
+      const constructors = constructorsData?.MRData?.ConstructorTable?.Constructors || [];
+      const teams: Team[] = constructors.map((c: any) => ({
+          id: c.constructorId,
+          name: c.name,
+          color: '#888888',
+      }));
+
+      // Drivers with constructor from standings
+      const standingsData = await fetchJson(`${base}/driverStandings.json`);
+      const standingsList = standingsData?.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings || [];
+      const drivers: Driver[] = standingsList.map((d: any) => ({
+          id: d.Driver?.driverId,
+          name: `${d.Driver?.givenName || ''} ${d.Driver?.familyName || ''}`.trim(),
+          teamId: d.Constructors?.[0]?.constructorId || '',
+          isActive: true,
+      }));
+
+      // Persist: replace existing docs
+      const scheduleCol = firestore.collection(`seasons/${seasonId}/schedule`);
+      const teamsColRef = firestore.collection(`seasons/${seasonId}/teams`);
+      const driversColRef = firestore.collection(`seasons/${seasonId}/drivers`);
+
+      const clearAndFill = async (col: firebase.firestore.CollectionReference, data: any[], getId: (item: any) => string) => {
+          const snap = await col.get();
+          const batch = firestore.batch();
+          snap.forEach(doc => batch.delete(doc.ref));
+          data.forEach(item => {
+              batch.set(col.doc(getId(item)), item);
+          });
+          await batch.commit();
+      };
+
+      await clearAndFill(scheduleCol, schedule, (g) => String(g.id));
+      await clearAndFill(teamsColRef, teams, (t) => t.id);
+      await clearAndFill(driversColRef, drivers, (d) => d.id);
+
+      clearActiveSeasonCache();
+  },
+
+  /**
+   * Importa calendario, equipos y pilotos desde un JSON ya estructurado.
+   * Estructura esperada: { schedule: GrandPrix[], teams: Team[], drivers: Driver[] }
+   */
+  importSeasonDataFromJson: async (seasonId: string, payload: { schedule: GrandPrix[], teams: Team[], drivers: Driver[] }): Promise<void> => {
+      if (!payload?.schedule || !payload?.teams || !payload?.drivers) {
+          throw new Error('JSON inválido. Debe incluir schedule, teams y drivers.');
+      }
+
+      const scheduleCol = firestore.collection(`seasons/${seasonId}/schedule`);
+      const teamsColRef = firestore.collection(`seasons/${seasonId}/teams`);
+      const driversColRef = firestore.collection(`seasons/${seasonId}/drivers`);
+
+      const clearAndFill = async (col: firebase.firestore.CollectionReference, data: any[], getId: (item: any) => string, label: string) => {
+          const snap = await col.get();
+          const batch = firestore.batch();
+          snap.forEach(doc => batch.delete(doc.ref));
+          data.forEach(item => {
+              batch.set(col.doc(getId(item)), item);
+          });
+          await batch.commit();
+          console.log(`importSeasonDataFromJson: reemplazados ${data.length} documentos en ${label}`);
+      };
+
+      await clearAndFill(scheduleCol, payload.schedule, (g) => String(g.id), `seasons/${seasonId}/schedule`);
+      await clearAndFill(teamsColRef, payload.teams, (t) => t.id, `seasons/${seasonId}/teams`);
+      await clearAndFill(driversColRef, payload.drivers, (d) => d.id, `seasons/${seasonId}/drivers`);
+
+      // Limpia cache de temporada activa para que las siguientes lecturas traigan los nuevos datos.
+      clearActiveSeasonCache();
+  },
+
+  /**
+   * Importa datos de temporada desde una URL (JSON) y los aplica a la temporada indicada.
+   */
+  importSeasonDataFromUrl: async (seasonId: string, url: string): Promise<void> => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`No se pudo obtener el JSON (${res.status})`);
+      const data = await res.json();
+      await db.importSeasonDataFromJson(seasonId, data as any);
+  },
 };

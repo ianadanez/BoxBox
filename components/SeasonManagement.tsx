@@ -13,6 +13,7 @@ const SeasonManagement: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [actionToConfirm, setActionToConfirm] = useState<(() => void) | null>(null);
     const [modalMessage, setModalMessage] = useState('');
+    const [importingSeasonId, setImportingSeasonId] = useState<string | null>(null);
 
     const fetchSeasons = async () => {
         setLoading(true);
@@ -27,6 +28,8 @@ const SeasonManagement: React.FC = () => {
         }
         setLoading(false);
     };
+
+    // Importadores desactivados (Ergast y JSON) a petición
 
     useEffect(() => {
         fetchSeasons();
@@ -112,6 +115,33 @@ const SeasonManagement: React.FC = () => {
         }
         setIsModalOpen(false);
         setActionToConfirm(null);
+    };
+
+    // Importar desde archivo JSON (mantener)
+    const handleImportJsonFile = (seasonId: string) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'application/json';
+        input.onchange = async () => {
+            const file = input.files?.[0];
+            if (!file) return;
+            try {
+                setImportingSeasonId(seasonId);
+                const text = await file.text();
+                const json = JSON.parse(text);
+                toast.info(`Importando JSON local para ${seasonId}...`);
+                await db.importSeasonDataFromJson(seasonId, json);
+                await fetchSeasons();
+                toast.success(`Temporada ${seasonId} importada desde archivo.`);
+            } catch (err: any) {
+                console.error("Error importando desde archivo JSON:", err);
+                toast.error(err.message || 'Error al importar el archivo.');
+            } finally {
+                setImportingSeasonId(null);
+                input.value = '';
+            }
+        };
+        input.click();
     };
 
     if (loading) {
@@ -222,6 +252,13 @@ const SeasonManagement: React.FC = () => {
                                                     Activar
                                                 </button>
                                             )}
+                                            <button
+                                                onClick={() => handleImportJsonFile(season.id)}
+                                                className="bg-purple-700 hover:bg-purple-800 text-white font-bold py-1 px-3 rounded text-sm"
+                                                disabled={importingSeasonId === season.id}
+                                            >
+                                                {importingSeasonId === season.id ? 'Importando...' : 'Importar temporada'}
+                                            </button>
                                         </td>
                                     </tr>
                                 ))
