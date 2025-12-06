@@ -1,0 +1,36 @@
+:root {
+  --float-duration: 0.9s;
+}
+
+@keyframes float-up-slow {
+  0% {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-float-up-slow {
+  animation: float-up-slow var(--float-duration) ease-out forwards;
+}
+
+@keyframes avatar-bob {
+  0% { transform: translateY(0) rotate(0deg); }
+  20% { transform: translateY(-6px) rotate(-6deg); }
+  50% { transform: translateY(3px) rotate(4deg); }
+  80% { transform: translateY(-3px) rotate(-4deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+
+.avatar-bob {
+  animation: avatar-bob 1.6s ease-in-out infinite alternate;
+  transform-origin: 50% 60%;
+  will-change: transform;
+}

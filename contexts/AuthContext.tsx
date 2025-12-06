@@ -15,7 +15,7 @@ interface RegisterDetails {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password?: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   register: (details: RegisterDetails) => Promise<void>;
   updateUser: (user: User) => void;
@@ -65,7 +65,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return () => unsubscribe();
   }, []);
 
-  const login = async (email: string, password = "password"): Promise<void> => {
+  const login = async (email: string, password: string): Promise<void> => {
     const userCredential = await auth.signInWithEmailAndPassword(email, password);
     if (!userCredential.user?.emailVerified) {
         // Log the user out immediately if their email is not verified

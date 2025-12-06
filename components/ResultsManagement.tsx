@@ -99,6 +99,8 @@ export const ResultsManagement: React.FC = () => {
         
         // FIX: Call the correct, newly implemented `publishResult` function from the db service.
         await db.publishResult(resultToPublish);
+        // Also refresh the public leaderboard snapshot so visitantes vean datos actualizados.
+        await db.publishPublicLeaderboard();
         setOfficialResult(resultToPublish);
         setDraftResult(null); 
         alert(`Resultados para ${selectedGp.name} publicados. Los puntajes serán recalculados.`);

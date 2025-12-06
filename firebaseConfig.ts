@@ -12,13 +12,6 @@ import 'firebase/compat/functions';
 // Fix for TypeScript error: Property 'env' does not exist on type 'ImportMeta'.
 const env = (import.meta as any).env;
 
-// !! DIAGNOSTIC LOG !!
-console.log("Firebase Config Vars:", {
-  apiKey: env.VITE_FIREBASE_API_KEY,
-  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: env.VITE_FIREBASE_PROJECT_ID,
-});
-
 const firebaseConfig = {
   apiKey: env.VITE_FIREBASE_API_KEY,
   authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,

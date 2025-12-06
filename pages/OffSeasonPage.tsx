@@ -5,15 +5,12 @@ import { SeasonTotal, Avatar as AvatarType, GrandPrix, Driver, OfficialResult, U
 import { db } from '../services/db';
 import { engine } from '../services/engine';
 import { useAuth } from '../contexts/AuthContext';
+import { getLastInactiveSeasonId } from '../services/seasonService';
 // TODO: El componente StandingsTable fue eliminado. Debe ser recreado para la OffSeasonPage.
 // import StandingsTable from '../components/common/StandingsTable';
 import Avatar from '../components/common/Avatar';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import Confetti from 'react-confetti';
-
-interface OffSeasonPageProps {
-    seasonYear: number;
-}
 
 // --- Componentes de la Tarjeta del Podio (Top 3 Users) ---
 const UserPodiumCard: React.FC<{
@@ -22,18 +19,18 @@ const UserPodiumCard: React.FC<{
     animationDelay: string;
 }> = ({ position, user, animationDelay }) => {
     const positionStyles: { [key: number]: string } = {
-        1: 'border-yellow-400 sm:h-48 shadow-yellow-400/30',
-        2: 'border-gray-400 sm:h-44 sm:self-end shadow-gray-400/20',
-        3: 'border-orange-400 sm:h-40 sm:self-end shadow-orange-400/20'
+        1: 'border-yellow-400 sm:h-56 shadow-yellow-400/30',
+        2: 'border-gray-400 sm:h-52 sm:self-end shadow-gray-400/20',
+        3: 'border-orange-400 sm:h-48 sm:self-end shadow-orange-400/20'
     };
     return (
         <div
-            className={`relative bg-[var(--background-light)] shadow-lg p-4 rounded-lg border-l-4 flex flex-col justify-center text-center opacity-0 animate-float-up ${positionStyles[position]}`}
-            style={{ animationDelay }}
+            className={`relative bg-[var(--background-light)] shadow-lg p-6 rounded-xl border-l-4 flex flex-col justify-center text-center animate-float-up-slow ${positionStyles[position]}`}
+            style={{ animationDelay: animationDelay || '0s' }}
         >
             <div className="absolute top-2 right-3 text-2xl font-bold text-white/50">#{position}</div>
             <div className="flex flex-col items-center justify-center">
-                <Avatar avatar={user.userAvatar} className="w-16 h-16 sm:w-20 sm:h-20 mb-3" />
+                <Avatar avatar={user.userAvatar} className="w-16 h-16 sm:w-20 sm:h-20 mb-3 avatar-bob" />
                 <p className="text-xl font-bold text-[var(--text-primary)]">
                     {position === 1 && '👑 '}
                     {user.userUsername}
@@ -100,8 +97,11 @@ const PredictionDetailModal: React.FC<{ standing: any, drivers: Driver[], onClos
 };
 
 // --- Página Principal de Fin de Temporada ---
-const OffSeasonPage: React.FC<OffSeasonPageProps> = ({ seasonYear }) => {
+const OffSeasonPage: React.FC = () => {
     const { user } = useAuth();
+    const [seasonId, setSeasonId] = useState<string | null>(null);
+    const [gpStandings, setGpStandings] = useState<any[]>([]);
+    const [viewingPredictionFor, setViewingPredictionFor] = useState<any | null>(null);
 
     // --- Estados Combinados ---
     const [loading, setLoading] = useState(true);
@@ -109,6 +109,9 @@ const OffSeasonPage: React.FC<OffSeasonPageProps> = ({ seasonYear }) => {
     
     // Datos generales
     const [seasonStandings, setSeasonStandings] = useState<(SeasonTotal & { userAvatar?: AvatarType, userUsername?: string })[]>([]);
+    const [seasonPage, setSeasonPage] = useState(0);
+    const [gpPage, setGpPage] = useState(0);
+    const USERS_PER_PAGE = 10;
     const [schedule, setSchedule] = useState<GrandPrix[]>([]);
     const [drivers, setDrivers] = useState<Driver[]>([]);
     const [allUsers, setAllUsers] = useState<User[]>([]);
@@ -118,32 +121,186 @@ const OffSeasonPage: React.FC<OffSeasonPageProps> = ({ seasonYear }) => {
     const [selectedGpId, setSelectedGpId] = useState<string>('');
     const [loadingRaceData, setLoadingRaceData] = useState(false);
     const [officialResult, setOfficialResult] = useState<OfficialResult | null>(null);
-    const [gpStandings, setGpStandings] = useState<any[]>([]);
-    const [viewingPredictionFor, setViewingPredictionFor] = useState<any | null>(null);
+
+    const renderSeasonTable = () => {
+        if (seasonStandings.length === 0) {
+            return <p className="text-center text-gray-400">Aún no hay tabla de la temporada.</p>;
+        }
+        const totalPages = Math.ceil(seasonStandings.length / USERS_PER_PAGE);
+        const page = Math.min(seasonPage, Math.max(totalPages - 1, 0));
+        const pageData = seasonStandings.slice(page * USERS_PER_PAGE, (page + 1) * USERS_PER_PAGE);
+        return (
+            <div className="space-y-4">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="border-b-2 border-[var(--border-color)]">
+                            <tr>
+                                <th className="p-3 text-sm font-semibold tracking-wide text-center">Pos</th>
+                                <th className="p-3 text-sm font-semibold tracking-wide">Usuario</th>
+                                <th className="p-3 text-sm font-semibold tracking-wide text-right">Puntos</th>
+                                <th className="hidden md:table-cell p-3 text-sm font-semibold tracking-wide text-center">P1</th>
+                                <th className="hidden md:table-cell p-3 text-sm font-semibold tracking-wide text-center">Pole</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {pageData.map((score, index) => (
+                                <tr key={score.userId} className="border-b border-[var(--border-color)]">
+                                    <td className="p-3 text-lg font-bold text-center text-[var(--text-secondary)]">{(page * USERS_PER_PAGE) + index + 1}</td>
+                                    <td className="p-2 font-medium">
+                                        <Link to={`/profile/${score.userId}`} className="flex items-center space-x-3 group">
+                                            <Avatar avatar={score.userAvatar} className="w-10 h-10" />
+                                            <span className="group-hover:text-[var(--accent-red)] transition-colors">{score.userUsername}</span>
+                                        </Link>
+                                    </td>
+                                    <td className="p-3 text-right font-mono text-lg font-bold text-[var(--accent-blue)]">{score.totalPoints}</td>
+                                    <td className="hidden md:table-cell p-3 text-center font-mono text-gray-400">{score.details?.exactP1 ?? '-'}</td>
+                                    <td className="hidden md:table-cell p-3 text-center font-mono text-gray-400">{score.details?.exactPole ?? '-'}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => setSeasonPage(Math.max(0, page - 1))} disabled={page === 0} className="px-4 py-2 text-sm font-medium rounded-md bg-[var(--background-light)] hover:bg-[var(--border-color)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            Anterior
+                        </button>
+                        <span className="text-sm text-[var(--text-secondary)]">
+                            Página {page + 1} de {totalPages}
+                        </span>
+                        <button onClick={() => setSeasonPage(Math.min(totalPages - 1, page + 1))} disabled={page >= totalPages - 1} className="px-4 py-2 text-sm font-medium rounded-md bg-[var(--background-light)] hover:bg-[var(--border-color)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            Siguiente
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const renderGpTable = () => {
+        if (gpStandings.length === 0) {
+            return <p className="text-center text-gray-400">No hay tabla para este GP.</p>;
+        }
+        const totalPages = Math.ceil(gpStandings.length / USERS_PER_PAGE);
+        const page = Math.min(gpPage, Math.max(totalPages - 1, 0));
+        const pageData = gpStandings.slice(page * USERS_PER_PAGE, (page + 1) * USERS_PER_PAGE);
+        return (
+            <div className="space-y-4">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="border-b-2 border-[var(--border-color)]">
+                            <tr>
+                                <th className="p-3 text-sm font-semibold tracking-wide text-center">Pos</th>
+                                <th className="p-3 text-sm font-semibold tracking-wide">Usuario</th>
+                                <th className="p-3 text-sm font-semibold tracking-wide text-right">Puntos</th>
+                                <th className="hidden md:table-cell p-3 text-sm font-semibold tracking-wide text-center">P1</th>
+                                <th className="hidden md:table-cell p-3 text-sm font-semibold tracking-wide text-center">Pole</th>
+                                <th className="p-3 text-sm font-semibold tracking-wide text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {pageData.map((score, index) => (
+                                <tr key={`${score.userId}-${index}`} className="border-b border-[var(--border-color)]">
+                                    <td className="p-3 text-lg font-bold text-center text-[var(--text-secondary)]">{(page * USERS_PER_PAGE) + index + 1}</td>
+                                    <td className="p-2 font-medium">
+                                        <Link to={`/profile/${score.userId}`} className="flex items-center space-x-3 group">
+                                            <Avatar avatar={score.userAvatar} className="w-10 h-10" />
+                                            <span className="group-hover:text-[var(--accent-red)] transition-colors">{score.userUsername}</span>
+                                        </Link>
+                                    </td>
+                                    <td className="p-3 text-right font-mono text-lg font-bold text-[var(--accent-blue)]">{score.points}</td>
+                                    <td className="hidden md:table-cell p-3 text-center font-mono text-gray-400">{score.details?.exactP1 ?? '-'}</td>
+                                    <td className="hidden md:table-cell p-3 text-center font-mono text-gray-400">{score.details?.exactPole ?? '-'}</td>
+                                    <td className="p-3 text-right">
+                                        <button onClick={() => setViewingPredictionFor(score)} className="px-3 py-1 text-xs font-bold rounded-md bg-[var(--background-light)] hover:bg-[var(--border-color)] transition-colors">Ver predicción</button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => setGpPage(Math.max(0, page - 1))} disabled={page === 0} className="px-4 py-2 text-sm font-medium rounded-md bg-[var(--background-light)] hover:bg-[var(--border-color)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            Anterior
+                        </button>
+                        <span className="text-sm text-[var(--text-secondary)]">
+                            Página {page + 1} de {totalPages}
+                        </span>
+                        <button onClick={() => setGpPage(Math.min(totalPages - 1, page + 1))} disabled={page >= totalPages - 1} className="px-4 py-2 text-sm font-medium rounded-md bg-[var(--background-light)] hover:bg-[var(--border-color)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            Siguiente
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
 
     // --- Carga de Datos Inicial ---
     useEffect(() => {
+        const resolveSeason = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                const lastSeason = await getLastInactiveSeasonId();
+                if (!lastSeason) {
+                    setError('No hay una temporada finalizada para mostrar.');
+                    setLoading(false);
+                    return;
+                }
+                setSeasonId(lastSeason);
+            } catch (e) {
+                console.error('No se pudo determinar la temporada saliente:', e);
+                setError('No se pudo determinar la temporada saliente.');
+                setLoading(false);
+            }
+        };
+        resolveSeason();
+    }, []);
+
+    useEffect(() => {
+        if (!seasonId) return;
         const fetchInitialData = async () => {
             setLoading(true);
             setError(null);
             try {
-                const [seasonTotals, usersData, scheduleData, driversData] = await Promise.all([
-                    db.calculateSeasonTotals(seasonYear),
-                    db.getUsers(),
-                    db.getSchedule(seasonYear),
-                    db.getDrivers(),
-                ]);
+                const scheduleData = await db.getScheduleForSeason(seasonId);
+                const driversData = await db.getDriversForSeason(seasonId);
+                let leaderboard: (SeasonTotal & { userAvatar?: AvatarType, userUsername?: string })[] = [];
+                let usersData: User[] = [];
 
-                const hydratedLeaderboard = seasonTotals.map(standing => {
-                    const user = usersData.find(u => u.id === standing.userId);
-                    return {
-                        ...standing,
-                        userAvatar: user?.avatarUrl,
-                        userUsername: user?.username || standing.username,
-                    };
-                });
+                if (user) {
+                    const [seasonTotals, usersList] = await Promise.all([
+                        db.calculateSeasonTotalsForSeason(seasonId),
+                        db.getUsers(),
+                    ]);
+                    usersData = usersList;
+                    leaderboard = seasonTotals.map(standing => {
+                        const foundUser = usersData.find(u => u.id === standing.userId);
+                        return {
+                            ...standing,
+                            userAvatar: foundUser?.avatar,
+                            userUsername: foundUser?.username || (standing as any).username || standing.userId,
+                        };
+                    });
+                } else {
+                    // Public snapshot fallback
+                    const publicBoard = await db.getPublicLeaderboard(seasonId);
+                    leaderboard = publicBoard.map(entry => ({
+                        userId: entry.userId || '',
+                        userUsername: entry.userUsername,
+                        userAvatar: entry.userAvatar,
+                        totalPoints: entry.totalPoints,
+                        details: {
+                            exactPole: entry.details?.exactPole ?? 0,
+                            exactP1: entry.details?.exactP1 ?? 0,
+                            exactFastestLap: entry.details?.exactFastestLap ?? 0,
+                        },
+                    }));
+                }
 
-                setSeasonStandings(hydratedLeaderboard);
+                setSeasonStandings(leaderboard);
+                setSeasonPage(0);
                 setAllUsers(usersData);
                 setSchedule(scheduleData);
                 setDrivers(driversData);
@@ -157,7 +314,7 @@ const OffSeasonPage: React.FC<OffSeasonPageProps> = ({ seasonYear }) => {
         };
 
         fetchInitialData();
-    }, [seasonYear]);
+    }, [seasonId, user]);
 
     // --- Lógica para manejar la selección de GP ---
     const handleRaceSelection = async (gpId: string) => {
@@ -174,11 +331,16 @@ const OffSeasonPage: React.FC<OffSeasonPageProps> = ({ seasonYear }) => {
 
         try {
             setLoadingRaceData(true);
-            const result = await db.getOfficialResult(parseInt(gpId));
+            const result = seasonId ? await db.getOfficialResultForSeason(seasonId, parseInt(gpId)) : undefined;
             setOfficialResult(result || null);
 
-            if (result) {
-                const predictions = await db.getPredictionsForGp(parseInt(gpId));
+            if (!result) {
+                setGpStandings([]);
+                return;
+            }
+
+            if (user) {
+                const predictions = seasonId ? await db.getPredictionsForGpInSeason(seasonId, parseInt(gpId)) : [];
                 const standingsPromises = predictions.map(async (prediction) => {
                     const gp = schedule.find(g => g.id === parseInt(gpId));
                     if (!gp) return null;
@@ -190,7 +352,7 @@ const OffSeasonPage: React.FC<OffSeasonPageProps> = ({ seasonYear }) => {
                     return {
                         userId: player?.id || '',
                         userUsername: player?.username || 'N/A',
-                        userAvatar: player?.avatarUrl,
+                        userAvatar: player?.avatar,
                         points: score.totalPoints,
                         prediction: prediction,
                         details: { exactP1: p1Hit, exactPole: poleHit },
@@ -200,6 +362,18 @@ const OffSeasonPage: React.FC<OffSeasonPageProps> = ({ seasonYear }) => {
                 let allStandings = (await Promise.all(standingsPromises)).filter(s => s !== null) as any[];
                 allStandings.sort((a, b) => b.points - a.points);
                 setGpStandings(allStandings);
+                setGpPage(0);
+            } else {
+                const publicGp = await db.getPublicGpStandings(seasonId!, parseInt(gpId));
+                const mapped = publicGp.map(entry => ({
+                    userId: entry.userId || '',
+                    userUsername: entry.userUsername,
+                    userAvatar: entry.userAvatar,
+                    points: entry.totalPoints,
+                    details: entry.details || {},
+                }));
+                setGpStandings(mapped);
+                setGpPage(0);
             }
         } catch (err) {
             console.error("Error loading race data:", err);
@@ -212,7 +386,8 @@ const OffSeasonPage: React.FC<OffSeasonPageProps> = ({ seasonYear }) => {
     // --- Renderizado ---
     if (loading) return <LoadingSpinner />;
 
-    const champions = seasonStandings.slice(0, 3);
+    const champions = [...seasonStandings].sort((a, b) => b.totalPoints - a.totalPoints).slice(0, 3);
+    const seasonLabel = seasonId || 'la temporada';
     const wrappedLink = user ? '/wrapped' : '/login';
     const linkState = user ? {} : { state: { from: '/wrapped' } };
 
@@ -223,18 +398,22 @@ const OffSeasonPage: React.FC<OffSeasonPageProps> = ({ seasonYear }) => {
             
             <div className="container mx-auto p-4 sm:p-6 lg:p-8 max-w-6xl text-white">
                 <div className="text-center mb-8">
-                    <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold f1-yellow-text">Fin de Temporada {seasonYear}</h1>
-                    <p className="text-lg sm:text-xl text-[var(--text-secondary)] mt-4">¡La temporada {seasonYear} ha concluido! Felicidades a los ganadores y prepárense para la próxima.</p>
+                    <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold f1-yellow-text">Fin de {seasonLabel}</h1>
+                    <p className="text-lg sm:text-xl text-[var(--text-secondary)] mt-4">¡La temporada {seasonLabel} ha concluido! Felicidades a los ganadores y prepárense para la próxima.</p>
                 </div>
 
-                {champions.length > 0 && (
+                {champions.length > 0 ? (
                     <div className="mb-12">
-                        <h2 className="text-2xl sm:text-3xl font-bold mb-6 f1-red-text text-center">🏆 Podio de Campeones {seasonYear} 🏆</h2>
+                        <h2 className="text-2xl sm:text-3xl font-bold mb-6 f1-red-text text-center">🏆 Podio de Campeones {seasonLabel} 🏆</h2>
                         <div className="flex flex-col sm:flex-row gap-4 sm:items-end max-w-3xl mx-auto">
-                            {champions[1] && <div className="w-full sm:w-1/3 order-2 sm:order-1"><UserPodiumCard position={2} user={champions[1]} animationDelay="0.2s" /></div>}
+                            {champions[1] && <div className="w-full sm:w-1/3 order-2 sm:order-1"><UserPodiumCard position={2} user={champions[1]} animationDelay="0.15s" /></div>}
                             {champions[0] && <div className="w-full sm:w-1/3 order-1 sm:order-2"><UserPodiumCard position={1} user={champions[0]} animationDelay="0s" /></div>}
-                            {champions[2] && <div className="w-full sm:w-1/3 order-3 sm:order-3"><UserPodiumCard position={3} user={champions[2]} animationDelay="0.4s" /></div>}
+                            {champions[2] && <div className="w-full sm:w-1/3 order-3 sm:order-3"><UserPodiumCard position={3} user={champions[2]} animationDelay="0.35s" /></div>}
                         </div>
+                    </div>
+                ) : (
+                    <div className="mb-12 text-center text-gray-400">
+                        No hay suficientes datos para mostrar el podio de campeones.
                     </div>
                 )}
 
@@ -246,7 +425,7 @@ const OffSeasonPage: React.FC<OffSeasonPageProps> = ({ seasonYear }) => {
 
                 {/* --- Sección de Resumen de Temporada Integrada --- */}
                 <div className="mt-12">
-                    <h2 className="text-2xl sm:text-3xl font-bold mb-6 f1-red-text text-center">Análisis de la Temporada {seasonYear}</h2>
+                    <h2 className="text-2xl sm:text-3xl font-bold mb-6 f1-red-text text-center">Análisis de la Temporada {seasonLabel}</h2>
                     <div className="my-6 sm:my-8 p-4 sm:p-6 bg-[var(--background-medium)] rounded-xl border border-[var(--border-color)] max-w-4xl mx-auto">
                         <p className="text-center text-base sm:text-lg text-[var(--text-secondary)] mb-4">Selecciona una carrera para ver su análisis o explora la clasificación general.</p>
                         <select value={selectedGpId} onChange={(e) => handleRaceSelection(e.target.value)} className="w-full p-3 text-base sm:text-lg bg-[var(--background-light)] border border-[var(--border-color)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-red)]">
@@ -258,9 +437,9 @@ const OffSeasonPage: React.FC<OffSeasonPageProps> = ({ seasonYear }) => {
                     {error && <div className="p-4 my-4 text-center text-red-400 bg-red-900/30 rounded-lg">{error}</div>}
 
                     {viewMode === 'season' && (
-                        // TODO: Reactivar cuando el componente StandingsTable esté listo.
-                        // <StandingsTable title={`Clasificación General ${seasonYear}`} standings={seasonStandings} />
-                        <p className="text-center text-gray-400">La tabla de clasificación general se mostrará aquí.</p>
+                        <>
+                            {renderSeasonTable()}
+                        </>
                     )}
 
                     {viewMode === 'gp' && (
@@ -271,10 +450,10 @@ const OffSeasonPage: React.FC<OffSeasonPageProps> = ({ seasonYear }) => {
                                     <h3 className="text-xl sm:text-2xl font-bold text-yellow-400 text-center">Resultados Oficiales - {schedule.find(g => g.id.toString() === selectedGpId)?.name}</h3>
                                     <PodiumDisplay podium={officialResult.racePodium || []} drivers={drivers} />
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
-                                        <ResultCard title="Pole Position" driverId={officialResult.pole} drivers={drivers} />
-                                        <ResultCard title="Vuelta Rápida" driverId={officialResult.fastestLap} drivers={drivers} />
-                                        <ResultCard title="Piloto del Día" driverId={officialResult.dotd} drivers={drivers} />
-                                    </div>
+                                          <ResultCard title="Pole Position" driverId={officialResult.pole} drivers={drivers} />
+                                          <ResultCard title="Vuelta Rápida" driverId={officialResult.fastestLap} drivers={drivers} />
+                                          <ResultCard title="Piloto del Día" driverId={officialResult.driverOfTheDay} drivers={drivers} />
+                                      </div>
                                     {/* TODO: Reactivar cuando el componente StandingsTable esté listo.
                                     <StandingsTable 
                                         title={`Clasificación de Jugadores - ${schedule.find(g => g.id.toString() === selectedGpId)?.name}`}
@@ -283,7 +462,7 @@ const OffSeasonPage: React.FC<OffSeasonPageProps> = ({ seasonYear }) => {
                                         onActionClick={(item) => setViewingPredictionFor(item)}
                                     />
                                     */}
-                                     <p className="text-center text-gray-400">La tabla de clasificación del GP se mostrará aquí.</p>
+                                     {renderGpTable()}
                                 </div>
                             )}
                             {!loadingRaceData && !officialResult && selectedGpId && <p className="text-center mt-8 text-gray-400">No hay resultados disponibles para esta carrera todavía.</p>}

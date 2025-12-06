@@ -1,9 +1,9 @@
 
-import { User, Team, Driver, GrandPrix, Prediction, OfficialResult, Result, Tournament, GpScore, SeasonTotal, PointAdjustment, Notification, ResultsNotification, TournamentInviteNotification, TournamentInviteAcceptedNotification, TournamentInviteDeclinedNotification, PokeNotification, PointsAdjustmentNotification, Season } from '../types';
+import { User, Team, Driver, GrandPrix, Prediction, OfficialResult, Result, Tournament, GpScore, SeasonTotal, PointAdjustment, Notification, ResultsNotification, TournamentInviteNotification, TournamentInviteAcceptedNotification, TournamentInviteDeclinedNotification, PokeNotification, PointsAdjustmentNotification, Season, PublicStanding } from '../types';
 import { TEAMS, DRIVERS, GP_SCHEDULE } from '../constants';
 import { engine } from './engine';
 // Import the season service functions
-import { getActiveSeason, clearActiveSeasonCache } from './seasonService';
+import { getActiveSeason, clearActiveSeasonCache, getLastInactiveSeasonId } from './seasonService';
 
 // FIX: Added firebase compat import for FieldValue operations.
 import firebase from 'firebase/compat/app';
@@ -11,11 +11,17 @@ import 'firebase/compat/firestore';
 // FIX: Corrected the import to match the export from firebaseConfig.ts
 import { firestore } from '../firebaseConfig';
 
+// Environment guard for client-only operations
+const env = (import.meta as any)?.env || {};
+const isDev = !!env.DEV;
+const allowClientSeed = env.VITE_ALLOW_CLIENT_SEED === 'true';
 
 // --- Top-Level Collection References ---
 const usersCol = firestore.collection('users');
 const notificationsCol = firestore.collection('notifications');
 const seasonsCol = firestore.collection('seasons'); // New collection ref
+const publicLeaderboardCol = (seasonId: string) => firestore.collection(`seasons/${seasonId}/public_leaderboard`);
+const publicGpStandingsCol = (seasonId: string, gpId: number) => firestore.collection(`seasons/${seasonId}/public_gp_standings/${gpId}/standings`);
 
 
 // --- SEASON-AWARE HELPER ---
@@ -31,6 +37,13 @@ const getSeasonCollection = async (collectionName: 'schedule' | 'predictions' | 
         console.warn(`No active season found. Cannot access collection '${collectionName}'.`);
         return null;
     }
+    return firestore.collection(`seasons/${seasonId}/${collectionName}`);
+};
+
+/**
+ * Explicit season collection reference (no dependency on active season).
+ */
+const getSeasonCollectionById = (seasonId: string, collectionName: 'schedule' | 'predictions' | 'results' | 'tournaments' | 'pointAdjustments' | 'draft_results' | 'teams' | 'drivers') => {
     return firestore.collection(`seasons/${seasonId}/${collectionName}`);
 };
 
@@ -57,9 +70,14 @@ export const db = {
   },
   getUsersByIds: async (ids: string[]): Promise<User[]> => {
       if (ids.length === 0) return [];
-      const q = usersCol.where(firebase.firestore.FieldPath.documentId(), 'in', ids);
-      const snapshot = await q.get();
-      return snapshot.docs.map(doc => applyUsernameFallback(doc.data() as User));
+      const chunks: string[][] = [];
+      for (let i = 0; i < ids.length; i += 10) {
+          chunks.push(ids.slice(i, i + 10));
+      }
+      const snapshots = await Promise.all(
+          chunks.map(chunk => usersCol.where(firebase.firestore.FieldPath.documentId(), 'in', chunk).get())
+      );
+      return snapshots.flatMap(snapshot => snapshot.docs.map(doc => applyUsernameFallback(doc.data() as User)));
   },
   getUserByEmail: async (email: string): Promise<User | undefined> => {
       const q = usersCol.where("email", "==", email);
@@ -164,9 +182,20 @@ export const db = {
       const snapshot = await teamsCol.get();
       return snapshot.docs.map(doc => doc.data() as Team);
   },
+  getTeamsForSeason: async (seasonId: string): Promise<Team[]> => {
+      const teamsCol = getSeasonCollectionById(seasonId, 'teams');
+      const snapshot = await teamsCol.get();
+      return snapshot.docs.map(doc => doc.data() as Team);
+  },
   getDrivers: async (activeOnly = false): Promise<Driver[]> => {
       const driversCol = await getSeasonCollection('drivers');
       if (!driversCol) return [];
+      const q = activeOnly ? driversCol.where("isActive", "==", true) : driversCol;
+      const snapshot = await q.get();
+      return snapshot.docs.map(doc => doc.data() as Driver);
+  },
+  getDriversForSeason: async (seasonId: string, activeOnly = false): Promise<Driver[]> => {
+      const driversCol = getSeasonCollectionById(seasonId, 'drivers');
       const q = activeOnly ? driversCol.where("isActive", "==", true) : driversCol;
       const snapshot = await q.get();
       return snapshot.docs.map(doc => doc.data() as Driver);
@@ -182,6 +211,12 @@ export const db = {
   getSchedule: async (): Promise<GrandPrix[]> => {
       const scheduleCol = await getSeasonCollection('schedule');
       if (!scheduleCol) return [];
+      const q = scheduleCol.orderBy("id");
+      const snapshot = await q.get();
+      return snapshot.docs.map(doc => doc.data() as GrandPrix);
+  },
+  getScheduleForSeason: async (seasonId: string): Promise<GrandPrix[]> => {
+      const scheduleCol = getSeasonCollectionById(seasonId, 'schedule');
       const q = scheduleCol.orderBy("id");
       const snapshot = await q.get();
       return snapshot.docs.map(doc => doc.data() as GrandPrix);
@@ -220,9 +255,15 @@ export const db = {
       const docSnap = await docRef.get();
       return docSnap.exists ? docSnap.data() as Prediction : undefined;
   },
-   getPredictionsForUser: async (userId: string): Promise<Prediction[]> => {
+  getPredictionsForUser: async (userId: string): Promise<Prediction[]> => {
     const predictionsCol = await getSeasonCollection('predictions');
     if (!predictionsCol) return [];
+    const q = predictionsCol.where("userId", "==", userId);
+    const snapshot = await q.get();
+    return snapshot.docs.map(doc => doc.data() as Prediction);
+  },
+  getPredictionsForUserInSeason: async (seasonId: string, userId: string): Promise<Prediction[]> => {
+    const predictionsCol = getSeasonCollectionById(seasonId, 'predictions');
     const q = predictionsCol.where("userId", "==", userId);
     const snapshot = await q.get();
     return snapshot.docs.map(doc => doc.data() as Prediction);
@@ -233,6 +274,27 @@ export const db = {
       const q = predictionsCol.where("gpId", "==", gpId);
       const snapshot = await q.get();
       return snapshot.docs.map(doc => doc.data() as Prediction);
+  },
+  getPredictionsForGpInSeason: async (seasonId: string, gpId: number): Promise<Prediction[]> => {
+      const predictionsCol = getSeasonCollectionById(seasonId, 'predictions');
+      const q = predictionsCol.where("gpId", "==", gpId);
+      const snapshot = await q.get();
+      return snapshot.docs.map(doc => doc.data() as Prediction);
+  },
+  // Public snapshots (precomputed and safe to expose)
+  getPublicLeaderboard: async (seasonId: string): Promise<PublicStanding[]> => {
+      const snapshot = await publicLeaderboardCol(seasonId).orderBy('totalPoints', 'desc').get();
+      return snapshot.docs.map(doc => doc.data() as PublicStanding);
+  },
+  getPublicLeaderboardForActiveSeason: async (): Promise<PublicStanding[]> => {
+      const seasonId = await getActiveSeason();
+      if (!seasonId) return [];
+      const snapshot = await publicLeaderboardCol(seasonId).orderBy('totalPoints', 'desc').get();
+      return snapshot.docs.map(doc => doc.data() as PublicStanding);
+  },
+  getPublicGpStandings: async (seasonId: string, gpId: number): Promise<PublicStanding[]> => {
+      const snapshot = await publicGpStandingsCol(seasonId, gpId).orderBy('totalPoints', 'desc').get();
+      return snapshot.docs.map(doc => doc.data() as PublicStanding);
   },
   savePrediction: async (prediction: Prediction): Promise<void> => {
       const predictionsCol = await getSeasonCollection('predictions');
@@ -262,9 +324,20 @@ export const db = {
       const snapshot = await resultsCol.orderBy("gpId").get();
       return snapshot.docs.map(doc => doc.data() as OfficialResult);
   },
+  getOfficialResultsForSeason: async (seasonId: string): Promise<OfficialResult[]> => {
+      const resultsCol = getSeasonCollectionById(seasonId, 'results');
+      const snapshot = await resultsCol.orderBy("gpId").get();
+      return snapshot.docs.map(doc => doc.data() as OfficialResult);
+  },
   getOfficialResult: async (gpId: number): Promise<OfficialResult | undefined> => {
       const resultsCol = await getSeasonCollection('results');
       if (!resultsCol) return undefined;
+      const docRef = resultsCol.doc(String(gpId));
+      const docSnap = await docRef.get();
+      return docSnap.exists ? docSnap.data() as OfficialResult : undefined;
+  },
+  getOfficialResultForSeason: async (seasonId: string, gpId: number): Promise<OfficialResult | undefined> => {
+      const resultsCol = getSeasonCollectionById(seasonId, 'results');
       const docRef = resultsCol.doc(String(gpId));
       const docSnap = await docRef.get();
       return docSnap.exists ? docSnap.data() as OfficialResult : undefined;
@@ -356,6 +429,25 @@ export const db = {
     const seasonId = await getActiveSeason();
     if (!seasonId) return [];
 
+    const usersSnap = await usersCol.get();
+    const [predictionsSnap, resultsSnap, adjustmentsSnap] = await Promise.all([
+        firestore.collection(`seasons/${seasonId}/predictions`).get(),
+        firestore.collection(`seasons/${seasonId}/results`).get(),
+        firestore.collection(`seasons/${seasonId}/pointAdjustments`).orderBy("timestamp", "desc").get(),
+    ]);
+
+    const users = usersSnap.docs.map(d => applyUsernameFallback(d.data() as User));
+    const allPredictions = predictionsSnap.docs.map(d => d.data() as Prediction);
+    const officialResults = resultsSnap.docs.map(d => d.data() as OfficialResult);
+    const pointAdjustments = adjustmentsSnap.docs.map(d => d.data() as PointAdjustment);
+
+    return engine.calculateSeasonStandings(users, allPredictions, officialResults, pointAdjustments);
+  },
+
+  /**
+   * Calculates standings for a specific season id (used for off-season/wrapped).
+   */
+  calculateSeasonTotalsForSeason: async (seasonId: string): Promise<SeasonTotal[]> => {
     const usersSnap = await usersCol.get();
     const [predictionsSnap, resultsSnap, adjustmentsSnap] = await Promise.all([
         firestore.collection(`seasons/${seasonId}/predictions`).get(),
@@ -571,6 +663,9 @@ export const db = {
       await batch.commit();
   },
   seedFirebase: async (): Promise<void> => {
+      if (!isDev || !allowClientSeed) {
+          throw new Error("seedFirebase est\u00e1 deshabilitado en este entorno. Solo se permite en desarrollo con VITE_ALLOW_CLIENT_SEED=true.");
+      }
       console.log("Starting Firebase seed...");
       const seasonId = await getActiveSeason();
       if (!seasonId) {
@@ -616,5 +711,110 @@ export const db = {
 
       console.log("NOTE: Test users (e.g., admin@boxbox.com) must be created manually in the Firebase Authentication console.");
       console.log("Firebase seed complete.");
+  },
+
+  /**
+   * Generates a simple "wrapped" summary for a user for a given season (defaults to last inactive, fallback active).
+   */
+  generateUserWrappedData: async (userId: string, seasonIdOverride?: string) => {
+      const seasonId = seasonIdOverride || await getLastInactiveSeasonId() || await getActiveSeason();
+      if (!seasonId) {
+          throw new Error("No hay temporada disponible para generar el resumen.");
+      }
+
+      const [predictions, results, standings, schedule, drivers] = await Promise.all([
+          db.getPredictionsForUserInSeason(seasonId, userId),
+          db.getOfficialResultsForSeason(seasonId),
+          db.calculateSeasonTotalsForSeason(seasonId),
+          db.getScheduleForSeason(seasonId),
+          db.getDriversForSeason(seasonId),
+      ]);
+
+      const totalPoints = standings.find(s => s.userId === userId)?.totalPoints || 0;
+
+      let bestGp = { gpName: 'Sin datos', points: 0 };
+      for (const prediction of predictions) {
+          const result = results.find(r => r.gpId === prediction.gpId);
+          const gp = schedule.find(g => g.id === prediction.gpId);
+          if (!result || !gp) continue;
+          const score = await engine.calculateGpScore(gp, prediction, result);
+          if (score && score.totalPoints > bestGp.points) {
+              bestGp = { gpName: gp.name, points: score.totalPoints };
+          }
+      }
+
+      const driverUsage: Record<string, number> = {};
+      const inc = (id?: string | null) => { if (id) driverUsage[id] = (driverUsage[id] || 0) + 1; };
+      predictions.forEach(p => {
+          inc(p.pole);
+          inc(p.fastestLap);
+          inc(p.driverOfTheDay);
+          p.racePodium?.forEach(inc);
+          p.sprintPodium?.forEach(inc);
+      });
+      const driverNameById = (id?: string) => drivers.find(d => d.id === id)?.name || 'N/A';
+      const favoriteDriverId = Object.keys(driverUsage).sort((a, b) => (driverUsage[b] || 0) - (driverUsage[a] || 0))[0];
+      const favoriteDriver = driverNameById(favoriteDriverId);
+
+      const nemesisCount: Record<string, number> = {};
+      predictions.forEach(p => {
+          const result = results.find(r => r.gpId === p.gpId);
+          if (result && p.pole && result.pole && p.pole !== result.pole) {
+              nemesisCount[p.pole] = (nemesisCount[p.pole] || 0) + 1;
+          }
+      });
+      const nemesisId = Object.keys(nemesisCount).sort((a, b) => (nemesisCount[b] || 0) - (nemesisCount[a] || 0))[0];
+      const nemesisDriver = driverNameById(nemesisId);
+
+      let poleHits = 0;
+      let podiumHits = 0;
+      predictions.forEach(p => {
+          const result = results.find(r => r.gpId === p.gpId);
+          if (!result) return;
+          if (p.pole && result.pole && p.pole === result.pole) poleHits += 1;
+          if (p.racePodium && result.racePodium) {
+              const exact = p.racePodium.filter((d, i) => result.racePodium?.[i] === d).length;
+              podiumHits += exact;
+          }
+      });
+
+      return {
+          totalPoints: { label: 'Puntos totales', value: totalPoints, description: 'Lo que sumaste en la temporada.' },
+          bestGp: { label: 'Tu mejor GP', value: bestGp },
+          favoriteDriver: { label: 'Piloto favorito', value: favoriteDriver, description: 'El que más elegiste en tus predicciones.' },
+          nemesisDriver: { label: 'Piloto némesis', value: nemesisDriver, description: 'Te falló en las poles más veces.' },
+          polePositionHits: { label: 'Poles acertadas', value: poleHits, description: 'Predicciones de pole correctas.' },
+          podiumHits: { label: 'Podios exactos', value: podiumHits, description: 'Posiciones exactas que acertaste en podios.' },
+      };
+  },
+
+  /**
+   * Publica un leaderboard público (sanitizado) para una temporada (por defecto la activa).
+   */
+  publishPublicLeaderboard: async (seasonIdOverride?: string): Promise<number> => {
+      const seasonId = seasonIdOverride || await getActiveSeason();
+      if (!seasonId) throw new Error('No hay temporada activa para publicar leaderboard público.');
+
+      const standings = await db.calculateSeasonTotalsForSeason(seasonId);
+      const batch = firestore.batch();
+
+      const colRef = publicLeaderboardCol(seasonId);
+      const existing = await colRef.get();
+      existing.forEach(doc => batch.delete(doc.ref));
+
+      standings.forEach(s => {
+          const docRef = colRef.doc(s.userId || colRef.doc().id);
+          const entry: PublicStanding = {
+              userId: s.userId,
+              userUsername: s.userUsername,
+              userAvatar: s.userAvatar,
+              totalPoints: s.totalPoints,
+              details: s.details,
+          };
+          batch.set(docRef, entry);
+      });
+
+      await batch.commit();
+      return standings.length;
   },
 };

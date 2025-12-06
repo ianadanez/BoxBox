@@ -79,13 +79,30 @@ const HomePage: React.FC = () => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [schedule, officialResults, driversData, teamsData, seasonTotals] = await Promise.all([
+                const [schedule, officialResults, driversData, teamsData] = await Promise.all([
                     db.getSchedule(),
                     db.getOfficialResults(),
                     db.getDrivers(),
                     db.getTeams(),
-                    db.calculateSeasonTotals(),
                 ]);
+
+                let seasonTotals = [];
+                if (user) {
+                    seasonTotals = await db.calculateSeasonTotals();
+                } else {
+                    const publicBoard = await db.getPublicLeaderboardForActiveSeason();
+                    seasonTotals = publicBoard.map(entry => ({
+                        userId: entry.userId || '',
+                        userUsername: entry.userUsername,
+                        userAvatar: entry.userAvatar,
+                        totalPoints: entry.totalPoints,
+                        details: {
+                            exactP1: entry.details?.exactP1 ?? 0,
+                            exactPole: entry.details?.exactPole ?? 0,
+                            exactFastestLap: entry.details?.exactFastestLap ?? 0,
+                        },
+                    }));
+                }
                 
                 const now = new Date();
                 

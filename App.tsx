@@ -1,12 +1,13 @@
 
 import React, { Suspense, useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import './styles/animations.css';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import CookieConsent from './components/common/CookieConsent';
 import LoadingSpinner from './components/common/LoadingSpinner';
-import { checkIsOffSeason } from './services/seasonService'; // Import the service
+import { listenToActiveSeason } from './services/seasonService'; // Import the service
 
 // Lazy Load Pages
 const HomePage = React.lazy(() => import('./pages/HomePage'));
@@ -21,6 +22,7 @@ const ResultsReviewPage = React.lazy(() => import('./pages/ResultsReviewPage'));
 const HowToPlayPage = React.lazy(() => import('./pages/HowToPlayPage'));
 const EmailVerificationPage = React.lazy(() => import('./pages/EmailVerificationPage'));
 const OffSeasonPage = React.lazy(() => import('./pages/OffSeasonPage'));
+const SeasonWrappedPage = React.lazy(() => import('./pages/SeasonWrappedPage'));
 
 const PrivateRoute: React.FC<{ children: React.ReactNode, adminOnly?: boolean }> = ({ children, adminOnly = false }) => {
     const { user, loading } = useAuth();
@@ -34,17 +36,20 @@ const AppRoutes: React.FC = () => {
     const [isOffSeason, setIsOffSeason] = useState<boolean | null>(null);
 
     useEffect(() => {
-        const determineSeasonStatus = async () => {
-            const offSeasonStatus = await checkIsOffSeason();
-            setIsOffSeason(offSeasonStatus);
+        // Live listener to react immediately to season status changes (no cache dependency)
+        const unsub = listenToActiveSeason((seasonId) => {
+            setIsOffSeason(seasonId === null);
+        });
+        return () => {
+            if (unsub) unsub();
         };
-        determineSeasonStatus();
     }, []);
 
     if (isOffSeason === null) {
         return <LoadingSpinner />;
     }
 
+    // If no active season, show OffSeasonPage and bypass the rest of the routes.
     return (
         <Routes>
             <Route path="/" element={isOffSeason ? <OffSeasonPage /> : <HomePage />} />
@@ -58,6 +63,7 @@ const AppRoutes: React.FC = () => {
             <Route path="/tournaments" element={<PrivateRoute><TournamentsPage /></PrivateRoute>} />
             <Route path="/results/:userId/:gpId" element={<PrivateRoute><ResultsReviewPage /></PrivateRoute>} />
             <Route path="/admin" element={<PrivateRoute adminOnly={true}><AdminPage /></PrivateRoute>} />
+            <Route path="/wrapped" element={<PrivateRoute><SeasonWrappedPage /></PrivateRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
     );

@@ -199,3 +199,21 @@ export interface SeasonTotal {
     details: ScoreDetail;
     pointAdjustments?: PointAdjustment[];
 }
+
+export type PublicStanding = {
+    userId?: string;
+    userUsername: string;
+    userAvatar: Avatar;
+    totalPoints: number;
+    details?: Partial<ScoreDetail>;
+};
+
+// Season Wrapped
+export interface SeasonWrappedData {
+    totalPoints: { label: string; value: number; description: string; };
+    bestGp: { label: string; value: { gpName: string; points: number }; };
+    favoriteDriver: { label: string; value: string; description: string; };
+    nemesisDriver: { label: string; value: string; description: string; };
+    polePositionHits: { label: string; value: number; description: string; };
+    podiumHits: { label: string; value: number; description: string; };
+}

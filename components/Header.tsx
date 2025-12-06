@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Avatar from './common/Avatar';
 import { User, Notification } from '../types';
 import { db } from '../services/db';
+import { listenToActiveSeason } from '../services/seasonService';
 
 const SearchIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-6 w-6"} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -162,6 +163,7 @@ const Header: React.FC = () => {
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [usersForNotifs, setUsersForNotifs] = useState<User[]>([]);
     const [nextGpId, setNextGpId] = useState<number | null>(null);
+    const [isOffSeason, setIsOffSeason] = useState<boolean | null>(null);
 
     const notifRef = useRef<HTMLDivElement>(null);
     const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -170,7 +172,21 @@ const Header: React.FC = () => {
 
     const hasUnseenNotifications = notifications.some(n => !n.seen);
 
+    // Listen for active season to toggle nav items (e.g., hide Predecir in off-season)
     useEffect(() => {
+        const unsub = listenToActiveSeason((seasonId) => {
+            setIsOffSeason(seasonId === null);
+        });
+        return () => {
+            if (unsub) unsub();
+        };
+    }, []);
+
+    useEffect(() => {
+        if (isOffSeason) {
+            setNextGpId(null);
+            return;
+        }
         const findNextGp = async () => {
             const schedule = await db.getSchedule();
             const now = new Date();
@@ -179,10 +195,12 @@ const Header: React.FC = () => {
                 .sort((a, b) => new Date(a.events.race).getTime() - new Date(b.events.race).getTime());
             if (upcomingGps.length > 0) {
                 setNextGpId(upcomingGps[0].id);
+            } else {
+                setNextGpId(null);
             }
         };
         findNextGp();
-    }, []);
+    }, [isOffSeason]);
 
     useEffect(() => {
         let unsubscribe: (() => void) | undefined;
@@ -265,9 +283,11 @@ const Header: React.FC = () => {
                         </Link>
                         <nav className="hidden md:flex space-x-6">
                             <NavLink to="/" className={({ isActive }) => `text-sm font-medium transition-colors ${isActive ? 'text-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-white'}`}>Inicio</NavLink>
-                            <NavLink to={nextGpId ? `/predict/${nextGpId}` : '/'} className={({ isActive }) => `text-sm font-medium transition-colors ${isActive ? 'text-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-white'}`}>Predecir</NavLink>
+                            {isOffSeason !== true && (
+                                <NavLink to={nextGpId ? `/predict/${nextGpId}` : '/'} className={({ isActive }) => `text-sm font-medium transition-colors ${isActive ? 'text-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-white'}`}>Predecir</NavLink>
+                            )}
                             <NavLink to="/tournaments" className={({ isActive }) => `text-sm font-medium transition-colors ${isActive ? 'text-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-white'}`}>Torneos</NavLink>
-                            <NavLink to="/how-to-play" className={({ isActive }) => `text-sm font-medium transition-colors ${isActive ? 'text-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-white'}`}>Cómo Jugar</NavLink>
+                              <NavLink to="/how-to-play" className={({ isActive }) => `text-sm font-medium transition-colors ${isActive ? 'text-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-white'}`}>Como Jugar</NavLink>
                         </nav>
                     </div>
 
@@ -334,9 +354,11 @@ const Header: React.FC = () => {
                  <div ref={mobileMenuRef} className="md:hidden bg-[var(--background-medium)] border-b border-[var(--border-color)]">
                     <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
                          <NavLink to="/" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `block px-3 py-2 rounded-md text-base font-medium ${isActive ? 'bg-[var(--accent-red)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--background-light)] hover:text-white'}`}>Inicio</NavLink>
-                         <NavLink to={nextGpId ? `/predict/${nextGpId}` : '/'} onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `block px-3 py-2 rounded-md text-base font-medium ${isActive ? 'bg-[var(--accent-red)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--background-light)] hover:text-white'}`}>Predecir</NavLink>
+                         {isOffSeason !== true && (
+                             <NavLink to={nextGpId ? `/predict/${nextGpId}` : '/'} onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `block px-3 py-2 rounded-md text-base font-medium ${isActive ? 'bg-[var(--accent-red)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--background-light)] hover:text-white'}`}>Predecir</NavLink>
+                         )}
                          <NavLink to="/tournaments" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `block px-3 py-2 rounded-md text-base font-medium ${isActive ? 'bg-[var(--accent-red)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--background-light)] hover:text-white'}`}>Torneos</NavLink>
-                         <NavLink to="/how-to-play" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `block px-3 py-2 rounded-md text-base font-medium ${isActive ? 'bg-[var(--accent-red)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--background-light)] hover:text-white'}`}>Cómo Jugar</NavLink>
+                           <NavLink to="/how-to-play" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `block px-3 py-2 rounded-md text-base font-medium ${isActive ? 'bg-[var(--accent-red)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--background-light)] hover:text-white'}`}>Como Jugar</NavLink>
                     </div>
                      {!isAuthenticated && (
                          <div className="px-2 pt-2 pb-3 space-y-2 border-t border-[var(--border-color)]">
