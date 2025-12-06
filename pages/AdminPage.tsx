@@ -10,12 +10,12 @@ import { ResultsManagement } from '../components/ResultsManagement';
 import { db } from '../services/db';
 import { toast } from 'react-toastify';
 
-type AdminTab = 'seasons' | 'results' | 'users' | 'calendar' | 'drivers';
+type AdminTab = 'results' | 'users' | 'calendar' | 'drivers' | 'seasons';
 
 const AdminPage: React.FC = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState<AdminTab>('seasons');
+    const [activeTab, setActiveTab] = useState<AdminTab>('results');
     const [publishing, setPublishing] = useState(false);
 
     useEffect(() => {
@@ -62,18 +62,18 @@ const AdminPage: React.FC = () => {
             </div>
 
             <div className="flex border-b border-[var(--border-color)] mb-6 overflow-x-auto">
-                <button onClick={() => setActiveTab('seasons')} className={`px-4 py-2 text-lg font-medium transition-colors whitespace-nowrap ${activeTab === 'seasons' ? 'f1-red-text border-b-2 border-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>Temporadas</button>
                 <button onClick={() => setActiveTab('results')} className={`px-4 py-2 text-lg font-medium transition-colors whitespace-nowrap ${activeTab === 'results' ? 'f1-red-text border-b-2 border-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>Resultados</button>
                 <button onClick={() => setActiveTab('users')} className={`px-4 py-2 text-lg font-medium transition-colors whitespace-nowrap ${activeTab === 'users' ? 'f1-red-text border-b-2 border-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>Usuarios</button>
                 <button onClick={() => setActiveTab('calendar')} className={`px-4 py-2 text-lg font-medium transition-colors whitespace-nowrap ${activeTab === 'calendar' ? 'f1-red-text border-b-2 border-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>Calendario</button>
                 <button onClick={() => setActiveTab('drivers')} className={`px-4 py-2 text-lg font-medium transition-colors whitespace-nowrap ${activeTab === 'drivers' ? 'f1-red-text border-b-2 border-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>Pilotos y Equipos</button>
+                <button onClick={() => setActiveTab('seasons')} className={`px-4 py-2 text-lg font-medium transition-colors whitespace-nowrap ${activeTab === 'seasons' ? 'f1-red-text border-b-2 border-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>Temporadas</button>
             </div>
             <div>
-                {activeTab === 'seasons' && <SeasonManagement />}
                 {activeTab === 'results' && <ResultsManagement />}
                 {activeTab === 'users' && <UsersManagement />}
                 {activeTab === 'calendar' && <CalendarManagement />}
                 {activeTab === 'drivers' && <DriversManagement />}
+                {activeTab === 'seasons' && <SeasonManagement />}
             </div>
         </div>
     );

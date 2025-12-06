@@ -26,8 +26,16 @@ export const ResultsManagement: React.FC = () => {
         const loadInitialData = async () => {
             setLoadingData(true);
             const [gpsData, driversData] = await Promise.all([db.getSchedule(), db.getDrivers(true)]);
+            // Preseleccionar el GP más próximo (futuro) o el siguiente no publicado.
+            const now = Date.now();
+            const upcoming = gpsData
+                .filter(gp => new Date(gp.events.race).getTime() >= now)
+                .sort((a, b) => new Date(a.events.race).getTime() - new Date(b.events.race).getTime());
+            const defaultGp = upcoming[0] || gpsData[0] || null;
+
             setGps(gpsData);
             setDrivers(driversData);
+            setSelectedGp(defaultGp || null);
             setLoadingData(false);
         };
         loadInitialData();
@@ -176,8 +184,12 @@ export const ResultsManagement: React.FC = () => {
     return (
         <div className="bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)]">
             <h2 className="text-2xl font-bold f1-red-text mb-4">Gestión de Resultados</h2>
-            <select onChange={(e) => setSelectedGp(gps.find(gp => gp.id === Number(e.target.value)) || null)} className="mb-4 bg-[var(--background-light)] p-2 rounded w-full max-w-xs border border-[var(--border-color)] focus:ring-2 focus:ring-[var(--accent-red)]">
-                <option>Seleccionar un Gran Premio...</option>
+            <select
+                value={selectedGp?.id ?? ''}
+                onChange={(e) => setSelectedGp(gps.find(gp => gp.id === Number(e.target.value)) || null)}
+                className="mb-4 bg-[var(--background-light)] p-2 rounded w-full max-w-xs border border-[var(--border-color)] focus:ring-2 focus:ring-[var(--accent-red)]"
+            >
+                <option value="">Seleccionar un Gran Premio...</option>
                 {gps.map(gp => <option key={gp.id} value={gp.id}>{gp.name}</option>)}
             </select>
 
