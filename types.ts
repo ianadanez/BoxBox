@@ -3,6 +3,9 @@ export interface Season {
   id: string; // e.g., "2025", "2026"
   name: string; // e.g., "Formula 1 Season 2025"
   status: 'active' | 'inactive';
+  startDate?: string; // ISO date string e.g., "2025-03-14"
+  endDate?: string; // ISO date string e.g., "2025-12-07"
+  year?: number;
 }
 
 export interface User {

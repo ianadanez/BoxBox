@@ -85,10 +85,11 @@ export const db = {
   },
 
   // --- SEASON MANAGEMENT ---
-  listSeasons: async (): Promise<Season[]> => {
-      const snapshot = await seasonsCol.get();
-      return snapshot.docs.map(doc => doc.data() as Season);
-  },
+    listSeasons: async (): Promise<Season[]> => {
+        const snapshot = await seasonsCol.get();
+        // sort by id (year)
+        return snapshot.docs.map(doc => doc.data() as Season).sort((a, b) => parseInt(a.id) - parseInt(b.id));
+    },
 
   switchActiveSeason: async (seasonId: string): Promise<void> => {
     const batch = firestore.batch();
@@ -136,6 +137,22 @@ export const db = {
 
       await batch.commit();
       console.log(`Successfully created and seeded season ${seasonId}.`);
+  },
+
+  updateSeason: async (season: Season): Promise<void> => {
+    const seasonRef = seasonsCol.doc(season.id);
+    await seasonRef.set(season, { merge: true });
+    },
+
+  setOffSeason: async (): Promise<void> => {
+    const batch = firestore.batch();
+    const allSeasonsSnap = await seasonsCol.get();
+    allSeasonsSnap.forEach(doc => {
+        batch.update(doc.ref, { status: 'inactive' });
+    });
+    await batch.commit();
+    clearActiveSeasonCache();
+    console.log('All seasons have been set to inactive. The app is now in off-season mode.');
   },
 
   // --- SEASONAL DATA ---
