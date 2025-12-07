@@ -3,12 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { Avatar as AvatarType, GpScore, User, SeasonTotal, Team } from '../types';
+import { Avatar as AvatarType, GpScore, User, SeasonTotal, Team, Season, Driver } from '../types';
 import Avatar from '../components/common/Avatar';
 import AvatarEditor from '../components/common/AvatarEditor';
 import { db } from '../services/db';
 import GoogleAd from '../components/common/GoogleAd';
 import { getActiveSeason, listenToActiveSeason } from '../services/seasonService';
+import { engine } from '../services/engine';
 
 const ProfilePage: React.FC = () => {
     const { userId } = useParams<{ userId: string }>();
@@ -27,13 +28,18 @@ const ProfilePage: React.FC = () => {
     const [gpScores, setGpScores] = useState<GpScore[]>([]);
     const [showAllResults, setShowAllResults] = useState(false);
     const [activeSeasonId, setActiveSeasonId] = useState<string | null>(null);
+    const [seasons, setSeasons] = useState<Season[]>([]);
+    const [selectedSeasonId, setSelectedSeasonId] = useState<string | null>(null);
     const [teams, setTeams] = useState<Team[]>([]);
+    const [drivers, setDrivers] = useState<Driver[]>([]);
     const [selectedFavoriteTeamId, setSelectedFavoriteTeamId] = useState<string>('');
     const [showFavoritePrompt, setShowFavoritePrompt] = useState(false);
+    const [copying, setCopying] = useState(false);
 
 
     const isOwnProfile = currentUser?.id === userId;
 
+    // Carga perfil y datos de temporada seleccionada
     useEffect(() => {
         const fetchProfileData = async () => {
             if (!userId) {
@@ -42,51 +48,80 @@ const ProfilePage: React.FC = () => {
             }
             setLoading(true);
             try {
-                const [userToView, seasonTotals, allOfficialResults, userPredictions] = await Promise.all([
+                const [userToView, seasonList, activeSeason] = await Promise.all([
                     db.getUserById(userId),
-                    db.calculateSeasonTotals(),
-                    db.getOfficialResults(),
-                    db.getPredictionsForUser(userId),
+                    db.listSeasons().catch(() => [] as Season[]),
+                    getActiveSeason(),
                 ]);
 
-                if (userToView) {
-                    setProfileUser(userToView);
-                    setUsername(userToView.username);
-                    setAvatar({
-                        skinColor: '#C68642', color: '#6CD3BF', secondaryColor: '#FFFFFF',
-                        eyes: 'normal', pattern: 'none', ...userToView.avatar,
-                    });
-                    
-                    const userStats = seasonTotals.find(s => s.userId === userToView.id);
-                    setStats(userStats || null);
-                    
-                    if (allOfficialResults.length > 0) {
-                        const scores: GpScore[] = [];
-                        for (const result of allOfficialResults) {
-                            const prediction = userPredictions.find(p => p.gpId === result.gpId);
-                            // FIX: Add defensive check to ensure the prediction belongs to the current profile user.
-                            // This prevents a rare data consistency issue where a new user might see another's predictions.
-                            if (prediction && prediction.userId === userId) {
-                                const score = await db.calculateGpScore(prediction, result);
-                                scores.push(score);
-                            } else {
-                                const gp = (await db.getSchedule()).find(g => g.id === result.gpId);
-                                scores.push({
-                                    gpId: result.gpId,
-                                    gpName: gp?.name || `GP ${result.gpId}`,
-                                    totalPoints: 0,
-                                    breakdown: { pole: 0, sprintPole: 0, sprintPodium: 0, racePodium: 0, fastestLap: 0, driverOfTheDay: 0 }
-                                });
-                            }
-                        }
-                        setGpScores(scores.sort((a, b) => b.gpId - a.gpId));
-                    }
+                if (!userToView) {
+                    navigate('/');
+                    return;
+                }
 
+                setProfileUser(userToView);
+                setUsername(userToView.username);
+                setAvatar({
+                    skinColor: '#C68642', color: '#6CD3BF', secondaryColor: '#FFFFFF',
+                    eyes: 'normal', pattern: 'none', ...userToView.avatar,
+                });
+
+                setSeasons(seasonList);
+                const seasonToUse = selectedSeasonId || activeSeason || seasonList[seasonList.length - 1]?.id || null;
+                if (!selectedSeasonId) setSelectedSeasonId(seasonToUse);
+
+                if (!seasonToUse) {
+                    setStats(null);
+                    setGpScores([]);
+                    setTeams([]);
+                    setDrivers([]);
+                    return;
+                }
+
+                const [
+                    seasonTotals,
+                    officialResults,
+                    userPredictions,
+                    seasonSchedule,
+                    seasonDrivers,
+                    seasonTeams,
+                ] = await Promise.all([
+                    db.calculateSeasonTotalsForSeason(seasonToUse),
+                    db.getOfficialResultsForSeason(seasonToUse),
+                    db.getPredictionsForUserInSeason(seasonToUse, userId),
+                    db.getScheduleForSeason(seasonToUse),
+                    db.getDriversForSeason(seasonToUse),
+                    db.getTeamsForSeason(seasonToUse),
+                ]);
+
+                const userStats = seasonTotals.find((s) => s.userId === userToView.id);
+                setStats(userStats || null);
+                setTeams(seasonTeams);
+                setDrivers(seasonDrivers);
+
+                if (officialResults.length > 0) {
+                    const scores: GpScore[] = [];
+                    for (const result of officialResults) {
+                        const prediction = userPredictions.find((p) => p.gpId === result.gpId);
+                        const gp = seasonSchedule.find((g) => g.id === result.gpId);
+                        if (prediction && gp) {
+                            const score = await engine.calculateGpScore(gp, prediction, result);
+                            scores.push(score);
+                        } else if (gp) {
+                            scores.push({
+                                gpId: result.gpId,
+                                gpName: gp.name,
+                                totalPoints: 0,
+                                breakdown: { pole: 0, sprintPole: 0, sprintPodium: 0, racePodium: 0, fastestLap: 0, driverOfTheDay: 0 },
+                            });
+                        }
+                    }
+                    setGpScores(scores.sort((a, b) => b.gpId - a.gpId));
                 } else {
-                    setProfileUser(null);
+                    setGpScores([]);
                 }
             } catch (error) {
-                console.error("Error fetching profile data:", error);
+                console.error('Error fetching profile data:', error);
                 setProfileUser(null);
             } finally {
                 setLoading(false);
@@ -94,9 +129,9 @@ const ProfilePage: React.FC = () => {
         };
 
         fetchProfileData();
-    }, [userId, navigate]);
+    }, [userId, navigate, selectedSeasonId]);
 
-    // Escucha la temporada activa y la deja en estado
+    // Escucha la temporada activa y la deja en estado (para favorito)
     useEffect(() => {
         const bootstrap = async () => {
             const initial = await getActiveSeason();
@@ -124,6 +159,16 @@ const ProfilePage: React.FC = () => {
         };
         loadSeasonFavorite();
     }, [isOwnProfile, profileUser, activeSeasonId]);
+
+    // Carga equipos también para perfiles ajenos (mostrar nombre/color)
+    useEffect(() => {
+        const loadTeams = async () => {
+            if (!selectedSeasonId) return;
+            const seasonTeams = await db.getTeamsForSeason(selectedSeasonId);
+            setTeams(seasonTeams);
+        };
+        loadTeams();
+    }, [selectedSeasonId]);
 
     useEffect(() => {
         const checkPokeStatus = async () => {
@@ -201,6 +246,18 @@ const ProfilePage: React.FC = () => {
         setIsEditing(true);
     };
 
+    const handleCopyLink = async () => {
+        if (!profileUser) return;
+        try {
+            setCopying(true);
+            await navigator.clipboard.writeText(window.location.href);
+        } catch (err) {
+            console.error('No se pudo copiar el enlace', err);
+        } finally {
+            setTimeout(() => setCopying(false), 1200);
+        }
+    };
+
     const handleSaveFavoriteTeam = async () => {
         if (!isOwnProfile || !currentUser || !activeSeasonId || !selectedFavoriteTeamId) return;
         const updatedUser = {
@@ -276,6 +333,19 @@ const ProfilePage: React.FC = () => {
                                 <input id="username" type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full max-w-md bg-[var(--background-light)] border border-[var(--border-color)] rounded-md p-2.5 text-white focus:ring-2 focus:ring-[var(--accent-red)]" />
                                 {usernameError && <p className="text-sm text-red-400 mt-2">{usernameError}</p>}
                             </div>
+                            <div>
+                                <label htmlFor="favoriteTeam" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Escudería favorita (temporada {activeSeasonId || 'actual'})</label>
+                                <select
+                                    id="favoriteTeam"
+                                    value={selectedFavoriteTeamId}
+                                    onChange={(e) => setSelectedFavoriteTeamId(e.target.value)}
+                                    className="w-full max-w-md bg-[var(--background-light)] border border-[var(--border-color)] rounded-md p-2.5 text-white focus:ring-2 focus:ring-[var(--accent-red)]"
+                                >
+                                    {teams.map(team => (
+                                        <option key={team.id} value={team.id}>{team.name}</option>
+                                    ))}
+                                </select>
+                            </div>
                             
                             <AvatarEditor avatar={avatar} onAvatarChange={setAvatar} />
 
@@ -284,34 +354,78 @@ const ProfilePage: React.FC = () => {
                         <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-8">
                            {avatar && <Avatar avatar={avatar} className="w-40 h-40" />}
                            <div className="flex-grow text-center sm:text-left">
-                               <h2 className="text-4xl font-bold">{profileUser.username}</h2>
-                               <p className="text-[var(--text-secondary)]">Miembro desde {new Date(profileUser.createdAt).toLocaleDateString()}</p>
-                           </div>
-                           {isOwnProfile && (
-                               <button onClick={handleEditClick} className="w-full sm:w-auto bg-[var(--accent-red)] hover:opacity-90 text-white font-bold py-2.5 px-6 rounded-md transition-opacity">
-                                    Editar Perfil
-                                </button>
-                           )}
+                                <h2 className="text-4xl font-bold">{profileUser.username}</h2>
+                                <p className="text-[var(--text-secondary)]">Miembro desde {new Date(profileUser.createdAt).toLocaleDateString()}</p>
+                                {teams.length > 0 && profileUser.favoriteTeamId && (
+                                    <p className="text-sm text-[var(--text-secondary)] mt-1">
+                                        Escudería favorita: <span className="font-semibold text-white">{teams.find(t => t.id === profileUser.favoriteTeamId)?.name || '—'}</span>
+                                    </p>
+                                )}
+                                {isOwnProfile && (
+                                    <button
+                                        onClick={handleCopyLink}
+                                        className="mt-3 inline-flex items-center space-x-2 text-sm text-[var(--accent-blue)] hover:opacity-80"
+                                        aria-label="Copiar enlace del perfil"
+                                    >
+                                        <span>{copying ? 'Copiado' : 'Copiar enlace del perfil'}</span>
+                                    </button>
+                                )}
+                            </div>
+                            {isOwnProfile && (
+                                <button onClick={handleEditClick} className="w-full sm:w-auto bg-[var(--accent-red)] hover:opacity-90 text-white font-bold py-2.5 px-6 rounded-md transition-opacity">
+                                     Editar Perfil
+                                 </button>
+                            )}
                         </div>
                        )}
                     </div>
                     <div className="bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)]">
-                        <h2 className="text-2xl font-bold f1-red-text mb-4">Resultados de la Temporada</h2>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                            <h2 className="text-2xl font-bold f1-red-text">Resultados de la Temporada {selectedSeasonId || activeSeasonId || ''}</h2>
+                            <div className="flex items-center gap-2">
+                                <label className="text-sm text-[var(--text-secondary)]">Temporada</label>
+                                <select
+                                    className="bg-[var(--background-light)] border border-[var(--border-color)] text-white rounded-md px-3 py-2"
+                                    value={selectedSeasonId || ''}
+                                    onChange={(e) => setSelectedSeasonId(e.target.value)}
+                                >
+                                    {seasons.map(s => (
+                                        <option key={s.id} value={s.id}>{s.name || s.id}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
                         {gpScores.length > 0 ? (
                             <>
-                                <div className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {resultsToShow.map(score => (
-                                        <div key={score.gpId} className="bg-[var(--background-light)] p-4 rounded-lg flex items-center justify-between flex-wrap gap-2">
-                                            <div>
-                                                <p className="font-bold text-lg text-white">{score.gpName}</p>
-                                                <p className="text-sm text-gray-400">Puntos Obtenidos: <span className="font-bold text-[var(--accent-blue)]">{score.totalPoints}</span></p>
+                                        <div
+                                            key={score.gpId}
+                                            className="relative overflow-hidden rounded-xl border border-[var(--border-color)] bg-gradient-to-br from-[var(--background-light)] to-[var(--background-medium)] p-4 shadow-lg shadow-black/30"
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div>
+                                                    <p className="text-xs text-[var(--text-secondary)]">GP #{score.gpId}</p>
+                                                    <p className="text-lg font-bold text-white">{score.gpName}</p>
+                                                    <div className="flex items-baseline gap-2 mt-2">
+                                                        <span className="text-2xl font-black text-[var(--accent-blue)]">{score.totalPoints}</span>
+                                                        <span className="text-xs text-[var(--text-secondary)]">pts</span>
+                                                    </div>
+                                                </div>
+                                                <Link
+                                                    to={`/results/${profileUser.id}/${score.gpId}?season=${selectedSeasonId || ''}`}
+                                                    className="text-xs font-semibold text-[var(--accent-blue)] bg-white/10 px-3 py-1 rounded-md border border-[var(--border-color)] hover:bg-white/15 transition-colors"
+                                                    aria-label={`Ver desglose de ${score.gpName}`}
+                                                >
+                                                    Ver desglose
+                                                </Link>
                                             </div>
-                                            <Link 
-                                                to={`/results/${profileUser.id}/${score.gpId}`}
-                                                className="bg-[var(--accent-blue)] text-black font-bold py-2 px-4 rounded-md hover:opacity-80 transition-opacity text-sm"
-                                            >
-                                                Ver Desglose
-                                            </Link>
+                                            <div className="flex flex-wrap gap-2 mt-3 text-[11px] text-[var(--text-secondary)]">
+                                                <span className="px-2 py-1 rounded-full bg-white/5 border border-[var(--border-color)]">Pole {score.breakdown.pole}</span>
+                                                <span className="px-2 py-1 rounded-full bg-white/5 border border-[var(--border-color)]">Sprint {score.breakdown.sprintPodium + score.breakdown.sprintPole}</span>
+                                                <span className="px-2 py-1 rounded-full bg-white/5 border border-[var(--border-color)]">Carrera {score.breakdown.racePodium}</span>
+                                                <span className="px-2 py-1 rounded-full bg-white/5 border border-[var(--border-color)]">VR {score.breakdown.fastestLap}</span>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -337,7 +451,8 @@ const ProfilePage: React.FC = () => {
 
                 {/* Sidebar */}
                 <div className="lg:col-span-1 bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)] self-start">
-                    <h2 className="text-2xl font-bold f1-red-text mb-4">Estadísticas</h2>
+                    <h2 className="text-2xl font-bold f1-red-text mb-1">Estadísticas</h2>
+                    <p className="text-sm text-[var(--text-secondary)] mb-4">Temporada {selectedSeasonId || activeSeasonId || 'actual'}</p>
                      {stats ? (
                         <div className="space-y-4">
                             <div className="flex justify-between items-baseline p-3 bg-[var(--background-light)] rounded-lg">
