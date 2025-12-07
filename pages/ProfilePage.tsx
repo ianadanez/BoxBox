@@ -3,11 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { Avatar as AvatarType, GpScore, User, SeasonTotal } from '../types';
+import { Avatar as AvatarType, GpScore, User, SeasonTotal, Team } from '../types';
 import Avatar from '../components/common/Avatar';
 import AvatarEditor from '../components/common/AvatarEditor';
 import { db } from '../services/db';
 import GoogleAd from '../components/common/GoogleAd';
+import { getActiveSeason, listenToActiveSeason } from '../services/seasonService';
 
 const ProfilePage: React.FC = () => {
     const { userId } = useParams<{ userId: string }>();
@@ -25,6 +26,10 @@ const ProfilePage: React.FC = () => {
     const [pokeCooldown, setPokeCooldown] = useState(false);
     const [gpScores, setGpScores] = useState<GpScore[]>([]);
     const [showAllResults, setShowAllResults] = useState(false);
+    const [activeSeasonId, setActiveSeasonId] = useState<string | null>(null);
+    const [teams, setTeams] = useState<Team[]>([]);
+    const [selectedFavoriteTeamId, setSelectedFavoriteTeamId] = useState<string>('');
+    const [showFavoritePrompt, setShowFavoritePrompt] = useState(false);
 
 
     const isOwnProfile = currentUser?.id === userId;
@@ -90,6 +95,35 @@ const ProfilePage: React.FC = () => {
 
         fetchProfileData();
     }, [userId, navigate]);
+
+    // Escucha la temporada activa y la deja en estado
+    useEffect(() => {
+        const bootstrap = async () => {
+            const initial = await getActiveSeason();
+            setActiveSeasonId(initial);
+        };
+        bootstrap();
+        const unsub = listenToActiveSeason((id) => setActiveSeasonId(id));
+        return () => { if (unsub) unsub(); };
+    }, []);
+
+    // Determina si hay que pedir favorito para la temporada activa
+    useEffect(() => {
+        const loadSeasonFavorite = async () => {
+            if (!isOwnProfile || !profileUser || !activeSeasonId) {
+                setShowFavoritePrompt(false);
+                return;
+            }
+            const seasonTeams = await db.getTeams();
+            setTeams(seasonTeams);
+            const existingFavorite = profileUser.favoriteTeamId;
+            const validExisting = existingFavorite && seasonTeams.some(t => t.id === existingFavorite);
+            setSelectedFavoriteTeamId(validExisting ? existingFavorite : (seasonTeams[0]?.id || ''));
+            const needsConfirmation = profileUser.favoriteTeamSeason !== activeSeasonId;
+            setShowFavoritePrompt(needsConfirmation);
+        };
+        loadSeasonFavorite();
+    }, [isOwnProfile, profileUser, activeSeasonId]);
 
     useEffect(() => {
         const checkPokeStatus = async () => {
@@ -166,6 +200,18 @@ const ProfilePage: React.FC = () => {
         if (!isOwnProfile) return;
         setIsEditing(true);
     };
+
+    const handleSaveFavoriteTeam = async () => {
+        if (!isOwnProfile || !currentUser || !activeSeasonId || !selectedFavoriteTeamId) return;
+        const updatedUser = {
+            ...currentUser,
+            favoriteTeamId: selectedFavoriteTeamId,
+            favoriteTeamSeason: activeSeasonId,
+        };
+        await updateUser(updatedUser);
+        setProfileUser(updatedUser);
+        setShowFavoritePrompt(false);
+    };
     
     if (loading) {
         return <div className="text-center p-8">Cargando perfil...</div>;
@@ -187,6 +233,34 @@ const ProfilePage: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Main content */}
                 <div className="lg:col-span-2 space-y-8">
+                     {isOwnProfile && showFavoritePrompt && (
+                        <div className="bg-[var(--background-medium)] p-4 sm:p-5 rounded-lg border border-[var(--border-color)] shadow-lg shadow-black/30">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <div>
+                                    <p className="text-sm text-[var(--text-secondary)]">Temporada {activeSeasonId || 'actual'}</p>
+                                    <h3 className="text-lg font-bold">Elegí tu escudería favorita para esta temporada</h3>
+                                    <p className="text-sm text-[var(--text-secondary)]">Se renueva cada año; confirmala acá.</p>
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                                    <select
+                                        value={selectedFavoriteTeamId}
+                                        onChange={(e) => setSelectedFavoriteTeamId(e.target.value)}
+                                        className="w-full sm:w-52 px-3 py-2 text-white bg-[var(--background-light)] border border-[var(--border-color)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--accent-red)]"
+                                    >
+                                        {teams.map(team => (
+                                            <option key={team.id} value={team.id}>{team.name}</option>
+                                        ))}
+                                    </select>
+                                    <button
+                                        onClick={handleSaveFavoriteTeam}
+                                        className="px-4 py-2 rounded-md bg-[var(--accent-red)] text-white font-bold hover:opacity-90 transition-colors"
+                                    >
+                                        Confirmar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                     )}
                      <div className="bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)]">
                        {isEditing && avatar ? (
                         <form onSubmit={handleSave} className="space-y-8">

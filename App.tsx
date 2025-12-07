@@ -8,6 +8,7 @@ import Footer from './components/Footer';
 import CookieConsent from './components/common/CookieConsent';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import { listenToActiveSeason } from './services/seasonService'; // Import the service
+import FavoriteTeamBanner from './components/common/FavoriteTeamBanner';
 
 // Lazy Load Pages
 const HomePage = React.lazy(() => import('./pages/HomePage'));
@@ -75,6 +76,7 @@ const App: React.FC = () => {
         <HashRouter>
             <div className="min-h-screen bg-[var(--background-dark)] text-[var(--text-primary)] flex flex-col">
                 <Header />
+                <FavoriteTeamBanner />
                 <main className="flex-grow flex flex-col">
                     <Suspense fallback={<LoadingSpinner />}>
                         <AppRoutes /> 

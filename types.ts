@@ -16,6 +16,7 @@ export interface User {
   role: 'user' | 'admin';
   avatar: Avatar;
   favoriteTeamId?: string;
+  favoriteTeamSeason?: string; // temporada en la que se confirmó el favorito
   createdAt: string;
 }
 

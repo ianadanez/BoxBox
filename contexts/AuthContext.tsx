@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { User, Avatar } from '../types';
 import { db } from '../services/db';
+import { getActiveSeason } from '../services/seasonService';
 import { auth } from '../firebaseConfig';
 // FIX: Removed modular auth imports to use compat API with the compat auth instance.
 
@@ -105,6 +106,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Send verification email
     await firebaseUser.sendEmailVerification();
 
+    const activeSeasonId = await getActiveSeason();
+
     const newUser: User = {
         id: firebaseUser.uid, // Use Firebase UID as the user ID
         username: details.username,
@@ -113,6 +116,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         role: 'user',
         avatar: details.avatar,
         favoriteTeamId: details.favoriteTeamId,
+        favoriteTeamSeason: activeSeasonId || undefined,
         createdAt: new Date().toISOString(),
     };
 
