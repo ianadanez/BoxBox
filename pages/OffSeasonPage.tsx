@@ -6,8 +6,7 @@ import { db } from '../services/db';
 import { engine } from '../services/engine';
 import { useAuth } from '../contexts/AuthContext';
 import { getLastInactiveSeasonId } from '../services/seasonService';
-// TODO: El componente StandingsTable fue eliminado. Debe ser recreado para la OffSeasonPage.
-// import StandingsTable from '../components/common/StandingsTable';
+import StandingsTable from '../components/common/StandingsTable';
 import Avatar from '../components/common/Avatar';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import Confetti from 'react-confetti';
@@ -123,116 +122,57 @@ const OffSeasonPage: React.FC = () => {
     const [officialResult, setOfficialResult] = useState<OfficialResult | null>(null);
 
     const renderSeasonTable = () => {
-        if (seasonStandings.length === 0) {
-            return <p className="text-center text-gray-400">Aún no hay tabla de la temporada.</p>;
-        }
-        const totalPages = Math.ceil(seasonStandings.length / USERS_PER_PAGE);
-        const page = Math.min(seasonPage, Math.max(totalPages - 1, 0));
-        const pageData = seasonStandings.slice(page * USERS_PER_PAGE, (page + 1) * USERS_PER_PAGE);
         return (
-            <div className="space-y-4">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead className="border-b-2 border-[var(--border-color)]">
-                            <tr>
-                                <th className="p-3 text-sm font-semibold tracking-wide text-center">Pos</th>
-                                <th className="p-3 text-sm font-semibold tracking-wide">Usuario</th>
-                                <th className="p-3 text-sm font-semibold tracking-wide text-right">Puntos</th>
-                                <th className="hidden md:table-cell p-3 text-sm font-semibold tracking-wide text-center">P1</th>
-                                <th className="hidden md:table-cell p-3 text-sm font-semibold tracking-wide text-center">Pole</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {pageData.map((score, index) => (
-                                <tr key={score.userId} className="border-b border-[var(--border-color)]">
-                                    <td className="p-3 text-lg font-bold text-center text-[var(--text-secondary)]">{(page * USERS_PER_PAGE) + index + 1}</td>
-                                    <td className="p-2 font-medium">
-                                        <Link to={`/profile/${score.userId}`} className="flex items-center space-x-3 group">
-                                            <Avatar avatar={score.userAvatar} className="w-10 h-10" />
-                                            <span className="group-hover:text-[var(--accent-red)] transition-colors">{score.userUsername}</span>
-                                        </Link>
-                                    </td>
-                                    <td className="p-3 text-right font-mono text-lg font-bold text-[var(--accent-blue)]">{score.totalPoints}</td>
-                                    <td className="hidden md:table-cell p-3 text-center font-mono text-gray-400">{score.details?.exactP1 ?? '-'}</td>
-                                    <td className="hidden md:table-cell p-3 text-center font-mono text-gray-400">{score.details?.exactPole ?? '-'}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <div className="flex items-center gap-2">
-                        <button onClick={() => setSeasonPage(Math.max(0, page - 1))} disabled={page === 0} className="px-4 py-2 text-sm font-medium rounded-md bg-[var(--background-light)] hover:bg-[var(--border-color)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                            Anterior
-                        </button>
-                        <span className="text-sm text-[var(--text-secondary)]">
-                            Página {page + 1} de {totalPages}
-                        </span>
-                        <button onClick={() => setSeasonPage(Math.min(totalPages - 1, page + 1))} disabled={page >= totalPages - 1} className="px-4 py-2 text-sm font-medium rounded-md bg-[var(--background-light)] hover:bg-[var(--border-color)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                            Siguiente
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <StandingsTable
+                title="Clasificación general de la temporada"
+                standings={seasonStandings}
+                page={seasonPage}
+                perPage={USERS_PER_PAGE}
+                onPageChange={setSeasonPage}
+                emptyMessage="Aún no hay tabla de la temporada."
+                renderUserCell={(item) =>
+                    item.userId ? (
+                        <Link to={`/profile/${item.userId}`} className="flex items-center space-x-3 group">
+                            <Avatar avatar={item.userAvatar} className="w-10 h-10" />
+                            <span className="group-hover:text-[var(--accent-red)] transition-colors">{item.userUsername}</span>
+                        </Link>
+                    ) : (
+                        <div className="flex items-center space-x-3">
+                            <Avatar avatar={item.userAvatar} className="w-10 h-10" />
+                            <span>{item.userUsername}</span>
+                        </div>
+                    )
+                }
+            />
         );
     };
 
     const renderGpTable = () => {
-        if (gpStandings.length === 0) {
-            return <p className="text-center text-gray-400">No hay tabla para este GP.</p>;
-        }
-        const totalPages = Math.ceil(gpStandings.length / USERS_PER_PAGE);
-        const page = Math.min(gpPage, Math.max(totalPages - 1, 0));
-        const pageData = gpStandings.slice(page * USERS_PER_PAGE, (page + 1) * USERS_PER_PAGE);
+        const selectedGpName = schedule.find(g => g.id.toString() === selectedGpId)?.name;
         return (
-            <div className="space-y-4">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead className="border-b-2 border-[var(--border-color)]">
-                            <tr>
-                                <th className="p-3 text-sm font-semibold tracking-wide text-center">Pos</th>
-                                <th className="p-3 text-sm font-semibold tracking-wide">Usuario</th>
-                                <th className="p-3 text-sm font-semibold tracking-wide text-right">Puntos</th>
-                                <th className="hidden md:table-cell p-3 text-sm font-semibold tracking-wide text-center">P1</th>
-                                <th className="hidden md:table-cell p-3 text-sm font-semibold tracking-wide text-center">Pole</th>
-                                <th className="p-3 text-sm font-semibold tracking-wide text-right">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {pageData.map((score, index) => (
-                                <tr key={`${score.userId}-${index}`} className="border-b border-[var(--border-color)]">
-                                    <td className="p-3 text-lg font-bold text-center text-[var(--text-secondary)]">{(page * USERS_PER_PAGE) + index + 1}</td>
-                                    <td className="p-2 font-medium">
-                                        <Link to={`/profile/${score.userId}`} className="flex items-center space-x-3 group">
-                                            <Avatar avatar={score.userAvatar} className="w-10 h-10" />
-                                            <span className="group-hover:text-[var(--accent-red)] transition-colors">{score.userUsername}</span>
-                                        </Link>
-                                    </td>
-                                    <td className="p-3 text-right font-mono text-lg font-bold text-[var(--accent-blue)]">{score.points}</td>
-                                    <td className="hidden md:table-cell p-3 text-center font-mono text-gray-400">{score.details?.exactP1 ?? '-'}</td>
-                                    <td className="hidden md:table-cell p-3 text-center font-mono text-gray-400">{score.details?.exactPole ?? '-'}</td>
-                                    <td className="p-3 text-right">
-                                        <button onClick={() => setViewingPredictionFor(score)} className="px-3 py-1 text-xs font-bold rounded-md bg-[var(--background-light)] hover:bg-[var(--border-color)] transition-colors">Ver predicción</button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <div className="flex items-center gap-2">
-                        <button onClick={() => setGpPage(Math.max(0, page - 1))} disabled={page === 0} className="px-4 py-2 text-sm font-medium rounded-md bg-[var(--background-light)] hover:bg-[var(--border-color)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                            Anterior
-                        </button>
-                        <span className="text-sm text-[var(--text-secondary)]">
-                            Página {page + 1} de {totalPages}
-                        </span>
-                        <button onClick={() => setGpPage(Math.min(totalPages - 1, page + 1))} disabled={page >= totalPages - 1} className="px-4 py-2 text-sm font-medium rounded-md bg-[var(--background-light)] hover:bg-[var(--border-color)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                            Siguiente
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <StandingsTable
+                title={selectedGpName ? `Clasificación de Jugadores - ${selectedGpName}` : undefined}
+                standings={gpStandings}
+                page={gpPage}
+                perPage={USERS_PER_PAGE}
+                onPageChange={setGpPage}
+                emptyMessage="No hay tabla para este GP."
+                actionButtonLabel="Ver predicción"
+                onActionClick={(item) => setViewingPredictionFor(item)}
+                renderUserCell={(item) =>
+                    item.userId ? (
+                        <Link to={`/profile/${item.userId}`} className="flex items-center space-x-3 group">
+                            <Avatar avatar={item.userAvatar} className="w-10 h-10" />
+                            <span className="group-hover:text-[var(--accent-red)] transition-colors">{item.userUsername}</span>
+                        </Link>
+                    ) : (
+                        <div className="flex items-center space-x-3">
+                            <Avatar avatar={item.userAvatar} className="w-10 h-10" />
+                            <span>{item.userUsername}</span>
+                        </div>
+                    )
+                }
+            />
         );
     };
 
@@ -454,14 +394,6 @@ const OffSeasonPage: React.FC = () => {
                                           <ResultCard title="Vuelta Rápida" driverId={officialResult.fastestLap} drivers={drivers} />
                                           <ResultCard title="Piloto del Día" driverId={officialResult.driverOfTheDay} drivers={drivers} />
                                       </div>
-                                    {/* TODO: Reactivar cuando el componente StandingsTable esté listo.
-                                    <StandingsTable 
-                                        title={`Clasificación de Jugadores - ${schedule.find(g => g.id.toString() === selectedGpId)?.name}`}
-                                        standings={gpStandings}
-                                        actionButtonLabel="Ver Predicción"
-                                        onActionClick={(item) => setViewingPredictionFor(item)}
-                                    />
-                                    */}
                                      {renderGpTable()}
                                 </div>
                             )}

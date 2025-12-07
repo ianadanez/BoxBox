@@ -3,7 +3,8 @@ import { firestore } from '../firebaseConfig'; // Assuming compat
 
 let activeSeasonId: string | null = null;
 let lastFetchTime: number = 0;
-const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
+// Keep cache short so season switches/off-season reflect quickly across the app.
+const CACHE_DURATION = 1000 * 30; // 30 seconds
 let activeSeasonUnsubscribe: (() => void) | null = null;
 
 /**
