@@ -190,13 +190,54 @@ export const db = {
   getNotificationSettings: async (): Promise<NotificationSettings> => {
       const snap = await notificationSettingsRef.get();
       const data = snap.exists ? (snap.data() as NotificationSettings) : undefined;
+      const legacyTitle = data?.predictionReminderTitle ?? '⏰ Recordatorio {sessionName}';
+      const legacyBody =
+          data?.predictionReminderBody ??
+          'No olvides completar tu predicción para {gpName}. Faltan {hours}h.';
+      const templates =
+          Array.isArray((data as any)?.predictionReminderTemplates) &&
+          (data as any).predictionReminderTemplates.length
+              ? (data as any).predictionReminderTemplates
+                    .map((item: any, index: number) => ({
+                        id: typeof item?.id === "string" ? item.id : `tpl_${index + 1}`,
+                        title: typeof item?.title === "string" ? item.title : legacyTitle,
+                        body: typeof item?.body === "string" ? item.body : legacyBody,
+                        enabled: item?.enabled !== false,
+                        weight: Number.isFinite(item?.weight) ? Number(item.weight) : 1,
+                    }))
+              : [
+                    {
+                        id: "default",
+                        title: legacyTitle,
+                        body: legacyBody,
+                        enabled: true,
+                        weight: 1,
+                    },
+                ];
+      const legacyOffsets = Array.isArray(data?.predictionReminderOffsets)
+          ? data?.predictionReminderOffsets.filter(v => Number.isFinite(v) && v > 0)
+          : [];
       return {
           pushMirrorEnabled: data?.pushMirrorEnabled ?? true,
           predictionReminderEnabled: data?.predictionReminderEnabled ?? false,
-          predictionReminderOffsets: data?.predictionReminderOffsets ?? [24],
           predictionReminderSessions: data?.predictionReminderSessions ?? ['quali', 'sprint_qualy'],
-          predictionReminderTitle: data?.predictionReminderTitle ?? '⏰ Recordatorio {sessionName}',
-          predictionReminderBody: data?.predictionReminderBody ?? 'No olvides completar tu predicción para {gpName}. Faltan {hours}h.',
+          predictionReminderCount:
+              Number.isFinite((data as any)?.predictionReminderCount) && Number((data as any)?.predictionReminderCount) > 0
+                  ? Number((data as any).predictionReminderCount)
+                  : legacyOffsets.length > 0
+                      ? legacyOffsets.length
+                      : 3,
+          predictionReminderWindowHours:
+              Number.isFinite((data as any)?.predictionReminderWindowHours) && Number((data as any)?.predictionReminderWindowHours) > 0
+                  ? Number((data as any).predictionReminderWindowHours)
+                  : legacyOffsets.length > 0
+                      ? Math.max(...legacyOffsets)
+                      : 24,
+          predictionReminderFinalOffsetMinutes: 10,
+          predictionReminderTemplates: templates,
+          predictionReminderOffsets: legacyOffsets,
+          predictionReminderTitle: legacyTitle,
+          predictionReminderBody: legacyBody,
           updatedAt: data?.updatedAt,
           updatedBy: data?.updatedBy,
       };

@@ -27,11 +27,24 @@ export interface FavoriteTeamAssignment {
   from: string; // ISO date string
 }
 
+export interface ReminderTemplate {
+  id?: string;
+  title: string;
+  body: string;
+  enabled?: boolean;
+  weight?: number;
+}
+
 export interface NotificationSettings {
   pushMirrorEnabled: boolean;
   predictionReminderEnabled: boolean;
-  predictionReminderOffsets: number[]; // hours before target session
   predictionReminderSessions: Array<'quali' | 'sprint_qualy'>;
+  predictionReminderCount: number;
+  predictionReminderWindowHours: number;
+  predictionReminderFinalOffsetMinutes?: number;
+  predictionReminderTemplates: ReminderTemplate[];
+  // Legacy fields kept for backward compatibility with old docs.
+  predictionReminderOffsets?: number[];
   predictionReminderTitle?: string;
   predictionReminderBody?: string;
   updatedAt?: any;
