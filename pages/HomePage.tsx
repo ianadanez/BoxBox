@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { GrandPrix, OfficialResult, Driver, Team, SeasonTotal } from '../types';
+import { GrandPrix, OfficialResult, Driver, Team, SeasonTotal, ConstructorStanding } from '../types';
 import { db } from '../services/db';
 import Countdown from '../components/common/Countdown';
 import Avatar from '../components/common/Avatar';
@@ -12,6 +12,14 @@ const getTeamColor = (driverId: string, drivers: Driver[], teams: Team[]) => {
   const driver = drivers.find(d => d.id === driverId);
   const team = teams.find(t => t.id === driver?.teamId);
   return team?.color || 'bg-gray-500';
+};
+
+const normalizeTeamColor = (value?: string) => {
+    if (!value) return '#9aa0a6';
+    if (value.startsWith('bg-[') && value.endsWith(']')) {
+        return value.slice(4, -1);
+    }
+    return value;
 };
 
 const ResultCard: React.FC<{ title: string; driverId?: string, drivers: Driver[], teams: Team[] }> = ({ title, driverId, drivers, teams }) => {
@@ -67,22 +75,25 @@ const HomePage: React.FC = () => {
         nextGp: GrandPrix | null;
         lastResult: OfficialResult | null;
         leaderboard: SeasonTotal[];
+        constructors: ConstructorStanding[];
         drivers: Driver[];
         teams: Team[];
-    }>({ lastGp: null, nextGp: null, lastResult: null, leaderboard: [], drivers: [], teams: [] });
+    }>({ lastGp: null, nextGp: null, lastResult: null, leaderboard: [], constructors: [], drivers: [], teams: [] });
     const [loading, setLoading] = useState(true);
 
     const TOP_LEADERBOARD_LIMIT = 10;
+    const TOP_CONSTRUCTORS_LIMIT = 5;
     
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [schedule, officialResults, driversData, teamsData] = await Promise.all([
+                const [schedule, officialResults, driversData, teamsData, constructorsData] = await Promise.all([
                     db.getSchedule(),
                     db.getOfficialResults(),
                     db.getDrivers(),
                     db.getTeams(),
+                    db.getPublicConstructorsLeaderboardForActiveSeason(),
                 ]);
 
                 let seasonTotals = [];
@@ -117,6 +128,7 @@ const HomePage: React.FC = () => {
                 setData({
                     drivers: driversData,
                     teams: teamsData,
+                    constructors: constructorsData,
                     leaderboard: seasonTotals,
                     lastGp: lastFinishedGp || null,
                     lastResult: lastFinishedGp ? (officialResults.find(r => r.gpId === lastFinishedGp.id) || null) : null,
@@ -133,6 +145,7 @@ const HomePage: React.FC = () => {
     }, []);
 
     const topLeaderboard = data.leaderboard.slice(0, TOP_LEADERBOARD_LIMIT);
+    const topConstructors = data.constructors.slice(0, TOP_CONSTRUCTORS_LIMIT);
 
     if (authLoading || loading) {
         return <div className="text-center p-8">Cargando...</div>;
@@ -140,8 +153,8 @@ const HomePage: React.FC = () => {
 
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-1 space-y-8">
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+                <div className="xl:col-span-4 space-y-8">
                     {loading && !data.lastGp && (
                          <div className="bg-[var(--background-medium)] p-6 rounded-xl border border-[var(--border-color)] animate-pulse">
                              <div className="h-8 w-3/4 bg-[var(--background-light)] rounded mb-6"></div>
@@ -190,7 +203,7 @@ const HomePage: React.FC = () => {
                         </div>
                     )}
                 </div>
-                <div className="lg:col-span-2 bg-[var(--background-medium)] p-6 rounded-xl border border-[var(--border-color)]">
+                <div className="xl:col-span-5 bg-[var(--background-medium)] p-6 rounded-xl border border-[var(--border-color)]">
                     <h2 className="text-2xl font-bold mb-4 f1-red-text">Tabla General de la Temporada (Top 10)</h2>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
@@ -236,6 +249,47 @@ const HomePage: React.FC = () => {
                      <div className="mt-8">
                         <GoogleAd slot="3093952327" />
                     </div>
+                </div>
+                <div className="xl:col-span-3 space-y-8">
+                    {topConstructors.length > 0 && (
+                        <div className="bg-[var(--background-medium)] rounded-xl border border-[var(--border-color)] p-4">
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="text-xl font-bold f1-red-text">Constructores (Top 5)</h3>
+                                <Link to="/leaderboard" className="text-sm font-semibold text-[var(--accent-blue)] hover:opacity-80 transition-opacity">
+                                    Ver tabla
+                                </Link>
+                            </div>
+                            <div className="space-y-2">
+                                {topConstructors.map((entry, index) => {
+                                    const isFavorite = Boolean(user?.favoriteTeamId && user.favoriteTeamId === entry.teamId);
+                                    return (
+                                        <div
+                                            key={entry.teamId}
+                                            className={`rounded-lg border border-[var(--border-color)] px-3 py-2 ${isFavorite ? 'bg-[var(--accent-red)]/15' : 'bg-[var(--background-light)]'}`}
+                                        >
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <span className="w-6 text-center text-sm font-semibold text-[var(--text-secondary)]">{index + 1}</span>
+                                                    <span
+                                                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                                                        style={{ backgroundColor: normalizeTeamColor(entry.teamColor) }}
+                                                    />
+                                                    <div className="min-w-0">
+                                                        <p className="font-medium truncate">
+                                                            {entry.teamName}
+                                                            {isFavorite && <span className="ml-2 text-xs font-semibold text-[var(--accent-red)]">· Tu equipo</span>}
+                                                        </p>
+                                                        <p className="text-xs text-[var(--text-secondary)]">Supporters: {entry.supporters}</p>
+                                                    </div>
+                                                </div>
+                                                <p className="font-mono text-lg font-bold text-[var(--accent-blue)]">{entry.totalPoints}</p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

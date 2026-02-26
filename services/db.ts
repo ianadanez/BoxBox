@@ -659,6 +659,27 @@ export const db = {
     return engine.calculateSeasonStandings(users, allPredictions, officialResults, pointAdjustments);
   },
 
+  /**
+   * Calcula constructores para una temporada usando solo puntos de predicción.
+   */
+  calculateConstructorsStandingsForSeason: async (seasonId: string): Promise<ConstructorStanding[]> => {
+    const [usersSnap, teamsSnap, scheduleSnap, predictionsSnap, resultsSnap] = await Promise.all([
+        usersCol.get(),
+        firestore.collection(`seasons/${seasonId}/teams`).get(),
+        firestore.collection(`seasons/${seasonId}/schedule`).get(),
+        firestore.collection(`seasons/${seasonId}/predictions`).get(),
+        firestore.collection(`seasons/${seasonId}/results`).get(),
+    ]);
+
+    const users = usersSnap.docs.map(d => applyUsernameFallback(d.data() as User));
+    const teams = teamsSnap.docs.map(d => d.data() as Team);
+    const schedule = scheduleSnap.docs.map(d => d.data() as GrandPrix);
+    const predictions = predictionsSnap.docs.map(d => d.data() as Prediction);
+    const officialResults = resultsSnap.docs.map(d => d.data() as OfficialResult);
+
+    return engine.calculateConstructorsStandings(teams, users, predictions, officialResults, schedule);
+  },
+
   // Tournaments
   getTournaments: async (): Promise<Tournament[]> => {
       const tournamentsCol = await getSeasonCollection('tournaments');
@@ -992,6 +1013,7 @@ export const db = {
       if (!seasonId) throw new Error('No hay temporada activa para publicar leaderboard público.');
 
       const standings = await db.calculateSeasonTotalsForSeason(seasonId);
+      const constructorsStandings = await db.calculateConstructorsStandingsForSeason(seasonId);
       const batch = firestore.batch();
 
       const colRef = publicLeaderboardCol(seasonId);
@@ -1006,6 +1028,23 @@ export const db = {
               userAvatar: s.userAvatar,
               totalPoints: s.totalPoints,
               details: s.details,
+          };
+          batch.set(docRef, entry);
+      });
+
+      const constructorsColRef = publicConstructorsLeaderboardCol(seasonId);
+      const existingConstructors = await constructorsColRef.get();
+      existingConstructors.forEach(doc => batch.delete(doc.ref));
+
+      constructorsStandings.forEach((s) => {
+          const docRef = constructorsColRef.doc(s.teamId || constructorsColRef.doc().id);
+          const entry: PublicConstructorStanding = {
+              teamId: s.teamId,
+              teamName: s.teamName,
+              teamColor: s.teamColor,
+              totalPoints: s.totalPoints,
+              supporters: s.supporters,
+              sourceUserPoints: s.sourceUserPoints,
           };
           batch.set(docRef, entry);
       });

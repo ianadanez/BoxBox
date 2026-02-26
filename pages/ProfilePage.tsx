@@ -10,6 +10,7 @@ import { db } from '../services/db';
 import GoogleAd from '../components/common/GoogleAd';
 import { getActiveSeason, listenToActiveSeason } from '../services/seasonService';
 import { engine } from '../services/engine';
+import { appendFavoriteTeamAssignment } from '../services/favoriteTeamHistory';
 
 const ProfilePage: React.FC = () => {
     const { userId } = useParams<{ userId: string }>();
@@ -241,7 +242,13 @@ const ProfilePage: React.FC = () => {
         const updatedUser = {
             ...currentUser,
             username: trimmedUsername,
-            avatar: avatar
+            avatar: avatar,
+            favoriteTeamId: selectedFavoriteTeamId || currentUser.favoriteTeamId,
+            favoriteTeamSeason: activeSeasonId || currentUser.favoriteTeamSeason,
+            favoriteTeamHistory:
+                selectedFavoriteTeamId && selectedFavoriteTeamId !== currentUser.favoriteTeamId
+                    ? appendFavoriteTeamAssignment(currentUser, selectedFavoriteTeamId)
+                    : currentUser.favoriteTeamHistory,
         };
         try {
             await updateUser(updatedUser);
@@ -282,6 +289,7 @@ const ProfilePage: React.FC = () => {
             ...currentUser,
             favoriteTeamId: selectedFavoriteTeamId,
             favoriteTeamSeason: activeSeasonId,
+            favoriteTeamHistory: appendFavoriteTeamAssignment(currentUser, selectedFavoriteTeamId),
         };
         await updateUser(updatedUser);
         setProfileUser(updatedUser);

@@ -1,5 +1,6 @@
 import { GrandPrix, Prediction, OfficialResult, GpScore, SeasonTotal, User, PointAdjustment, Team, ConstructorStanding } from '../types';
 import { SCORING_RULES as RULES, LOCK_MINUTES_BEFORE, CONSTRUCTORS_SCORING_RULES } from '../constants';
+import { normalizeFavoriteTeamHistory, resolveFavoriteTeamAt } from './favoriteTeamHistory';
 
 export const engine = {
     /**
@@ -161,19 +162,46 @@ export const engine = {
     },
 
     /**
-     * Calcula la tabla de constructores paralela.
-     * Regla: cada usuario aporta 1 punto a su equipo por cada 10 puntos propios.
+     * Calcula la tabla de constructores con asignación temporal.
+     * Reglas:
+     * - Solo usa puntos de predicción (sin ajustes manuales).
+     * - Un usuario aporta 1 punto al constructor por cada 10 puntos propios.
+     * - Si cambia de escudería, el aporte corre desde ese momento.
      */
     calculateConstructorsStandings: (
         teams: Team[],
         users: User[],
-        seasonStandings: SeasonTotal[],
-        seasonId?: string
+        predictions: Prediction[],
+        officialResults: OfficialResult[],
+        schedule: GrandPrix[]
     ): ConstructorStanding[] => {
-        const standingsByUserId = new Map(seasonStandings.map(standing => [standing.userId, standing]));
-        const teamStandings = new Map<string, ConstructorStanding>();
+        const predictionByUserGp = new Map<string, Prediction>();
+        predictions.forEach((prediction) => {
+            predictionByUserGp.set(`${prediction.userId}:${prediction.gpId}`, prediction);
+        });
 
-        teams.forEach(team => {
+        const scheduleByGpId = new Map<number, GrandPrix>(schedule.map((gp) => [gp.id, gp]));
+        const resolveResultTime = (result: OfficialResult): number => {
+            const gp = scheduleByGpId.get(result.gpId);
+            const candidates = [gp?.events?.race, gp?.events?.quali, result.publishedAt];
+            for (const candidate of candidates) {
+                if (!candidate) continue;
+                const parsed = new Date(candidate).getTime();
+                if (Number.isFinite(parsed)) return parsed;
+            }
+            return Number.MAX_SAFE_INTEGER;
+        };
+
+        const orderedResults = [...officialResults].sort((a, b) => {
+            const aTime = resolveResultTime(a);
+            const bTime = resolveResultTime(b);
+            if (aTime !== bTime) return aTime - bTime;
+            return a.gpId - b.gpId;
+        });
+
+        const teamStandings = new Map<string, ConstructorStanding>();
+        const supporterSets = new Map<string, Set<string>>();
+        teams.forEach((team) => {
             teamStandings.set(team.id, {
                 teamId: team.id,
                 teamName: team.name,
@@ -182,24 +210,50 @@ export const engine = {
                 supporters: 0,
                 sourceUserPoints: 0,
             });
+            supporterSets.set(team.id, new Set<string>());
         });
 
-        users.forEach(user => {
-            if (!user.favoriteTeamId) return;
-            if (seasonId && user.favoriteTeamSeason && user.favoriteTeamSeason !== seasonId) return;
+        users.forEach((user) => {
+            const history = normalizeFavoriteTeamHistory(user);
+            if (!history.length) return;
 
-            const teamStanding = teamStandings.get(user.favoriteTeamId);
-            if (!teamStanding) return;
+            let carryPoints = 0;
+            orderedResults.forEach((result) => {
+                const prediction = predictionByUserGp.get(`${user.id}:${result.gpId}`);
+                if (!prediction) return;
 
-            const userSeasonStanding = standingsByUserId.get(user.id);
-            const userPoints = Math.max(0, userSeasonStanding?.totalPoints || 0);
-            const constructorPoints =
-                Math.floor(userPoints / CONSTRUCTORS_SCORING_RULES.userPointsStep) *
-                CONSTRUCTORS_SCORING_RULES.constructorPointsPerStep;
+                const gp = scheduleByGpId.get(result.gpId) || {
+                    id: result.gpId,
+                    name: `GP ${result.gpId}`,
+                    country: "",
+                    track: "",
+                    hasSprint: !!result.sprintPole || !!result.sprintPodium,
+                    events: { quali: result.publishedAt, race: result.publishedAt },
+                };
 
-            teamStanding.supporters += 1;
-            teamStanding.sourceUserPoints += userPoints;
-            teamStanding.totalPoints += constructorPoints;
+                const userPredictionPoints = Math.max(0, engine.calculateGpScore(gp, prediction, result).totalPoints);
+                if (userPredictionPoints <= 0) return;
+
+                const resultTime = resolveResultTime(result);
+                const teamIdAtThatMoment = resolveFavoriteTeamAt(history, resultTime);
+                if (!teamIdAtThatMoment) return;
+
+                const teamStanding = teamStandings.get(teamIdAtThatMoment);
+                if (!teamStanding) return;
+
+                teamStanding.sourceUserPoints += userPredictionPoints;
+                supporterSets.get(teamIdAtThatMoment)?.add(user.id);
+
+                carryPoints += userPredictionPoints;
+                while (carryPoints >= CONSTRUCTORS_SCORING_RULES.userPointsStep) {
+                    teamStanding.totalPoints += CONSTRUCTORS_SCORING_RULES.constructorPointsPerStep;
+                    carryPoints -= CONSTRUCTORS_SCORING_RULES.userPointsStep;
+                }
+            });
+        });
+
+        teamStandings.forEach((standing, teamId) => {
+            standing.supporters = supporterSets.get(teamId)?.size || 0;
         });
 
         return Array.from(teamStandings.values()).sort((a, b) => {

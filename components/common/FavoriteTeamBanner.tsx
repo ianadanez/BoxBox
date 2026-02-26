@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { db } from '../../services/db';
 import { getActiveSeason, listenToActiveSeason } from '../../services/seasonService';
 import { Team } from '../../types';
+import { appendFavoriteTeamAssignment } from '../../services/favoriteTeamHistory';
 
 /**
  * Banner liviano que pide confirmar la escudería favorita para la temporada activa.
@@ -54,6 +55,7 @@ const FavoriteTeamBanner: React.FC = () => {
             ...user,
             favoriteTeamId: selectedTeamId,
             favoriteTeamSeason: activeSeasonId,
+            favoriteTeamHistory: appendFavoriteTeamAssignment(user, selectedTeamId),
         };
         await updateUser(updatedUser);
         setLoading(false);

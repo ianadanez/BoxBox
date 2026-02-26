@@ -33,7 +33,7 @@ const AdminPage: React.FC = () => {
         try {
             setPublishing(true);
             const count = await db.publishPublicLeaderboard();
-            toast.success(`Leaderboard público actualizado con ${count} usuarios.`);
+            toast.success(`Leaderboard público actualizado con ${count} usuarios y tabla de constructores.`);
         } catch (err: any) {
             console.error(err);
             toast.error(err.message || 'No se pudo publicar el leaderboard público.');
@@ -50,7 +50,7 @@ const AdminPage: React.FC = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
                         <p className="text-lg font-semibold">Leaderboard público</p>
-                        <p className="text-sm text-[var(--text-secondary)]">Publica una copia pública (username, avatar, puntos) para visitantes sin login.</p>
+                        <p className="text-sm text-[var(--text-secondary)]">Publica una copia pública de jugadores y constructores para visitantes sin login.</p>
                     </div>
                     <button
                         onClick={handlePublishPublicLeaderboard}

@@ -3,6 +3,7 @@ import { User, Avatar } from '../types';
 import { db } from '../services/db';
 import { getActiveSeason } from '../services/seasonService';
 import { auth } from '../firebaseConfig';
+import { appendFavoriteTeamAssignment } from '../services/favoriteTeamHistory';
 // FIX: Removed modular auth imports to use compat API with the compat auth instance.
 
 interface RegisterDetails {
@@ -120,6 +121,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         favoriteTeamId: details.favoriteTeamId,
         favoriteTeamSeason: activeSeasonId || undefined,
         createdAt: new Date().toISOString(),
+        favoriteTeamHistory: appendFavoriteTeamAssignment(
+          {
+            favoriteTeamId: undefined,
+            favoriteTeamHistory: [],
+            createdAt: new Date().toISOString(),
+          },
+          details.favoriteTeamId
+        ),
     };
 
     try {

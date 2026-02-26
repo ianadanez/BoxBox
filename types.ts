@@ -17,7 +17,13 @@ export interface User {
   avatar: Avatar;
   favoriteTeamId?: string;
   favoriteTeamSeason?: string; // temporada en la que se confirmó el favorito
+  favoriteTeamHistory?: FavoriteTeamAssignment[];
   createdAt: string;
+}
+
+export interface FavoriteTeamAssignment {
+  teamId: string;
+  from: string; // ISO date string
 }
 
 export interface NotificationSettings {
