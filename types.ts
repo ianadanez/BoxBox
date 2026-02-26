@@ -20,6 +20,31 @@ export interface User {
   createdAt: string;
 }
 
+export interface NotificationSettings {
+  pushMirrorEnabled: boolean;
+  predictionReminderEnabled: boolean;
+  predictionReminderOffsets: number[]; // hours before target session
+  predictionReminderSessions: Array<'quali' | 'sprint_qualy'>;
+  predictionReminderTitle?: string;
+  predictionReminderBody?: string;
+  updatedAt?: any;
+  updatedBy?: string;
+}
+
+export interface ScheduledNotification {
+  id?: string;
+  title: string;
+  body: string;
+  scheduledAt: any; // Firestore Timestamp
+  status?: 'pending' | 'sending' | 'sent' | 'error' | 'cancelled';
+  audience?: { type: 'all' | 'uids'; uids?: string[] };
+  data?: Record<string, unknown>;
+  createdAt?: any;
+  createdBy?: string;
+  error?: string;
+  sendCount?: number;
+}
+
 export interface Avatar {
   color: string;
   secondaryColor: string;
@@ -208,6 +233,17 @@ export type PublicStanding = {
     totalPoints: number;
     details?: Partial<ScoreDetail>;
 };
+
+export interface ConstructorStanding {
+    teamId: string;
+    teamName: string;
+    teamColor: string;
+    totalPoints: number;
+    supporters: number;
+    sourceUserPoints: number;
+}
+
+export type PublicConstructorStanding = ConstructorStanding;
 
 // Season Wrapped
 export interface SeasonWrappedData {

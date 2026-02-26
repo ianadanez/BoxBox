@@ -21,6 +21,11 @@ export const SCORING_RULES = {
   },
 };
 
+export const CONSTRUCTORS_SCORING_RULES = {
+  userPointsStep: 10,
+  constructorPointsPerStep: 1,
+};
+
 export const LOCK_MINUTES_BEFORE = 5;
 
 // Data for the one-time database seed

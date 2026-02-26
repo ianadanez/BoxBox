@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy:hosting": "npx firebase-tools deploy --only hosting --project f1prode-58763",
+    "deploy:rules": "npx firebase-tools deploy --only firestore:rules,firestore:indexes --project f1prode-58763",
+    "deploy:web": "npx firebase-tools deploy --only hosting,firestore:rules,firestore:indexes --project f1prode-58763"
   },
   "dependencies": {
     "firebase": "^12.1.0",

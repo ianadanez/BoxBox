@@ -5,35 +5,35 @@ import { db } from '../services/db';
 import { User } from '../types';
 import Avatar from '../components/common/Avatar';
 import GoogleAd from '../components/common/GoogleAd';
+import { useAuth } from '../contexts/AuthContext';
 
 const SearchPage: React.FC = () => {
-    const [allUsers, setAllUsers] = useState<User[]>([]);
     const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
     const [query, setQuery] = useState('');
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
+    const { user } = useAuth();
 
     useEffect(() => {
-        const fetchUsers = async () => {
-            setLoading(true);
-            const users = await db.getUsers();
-            setAllUsers(users);
-            setFilteredUsers(users); // Show all users initially
-            setLoading(false);
-        };
-        fetchUsers();
-    }, []);
-
-    useEffect(() => {
-        if (query.trim() === '') {
-            setFilteredUsers(allUsers);
-        } else {
-            const lowercasedQuery = query.toLowerCase();
-            const results = allUsers.filter(user =>
-                user.username.toLowerCase().includes(lowercasedQuery)
-            );
-            setFilteredUsers(results);
+        if (!user) {
+            setFilteredUsers([]);
+            return;
         }
-    }, [query, allUsers]);
+        const trimmed = query.trim();
+        if (!trimmed) {
+            setFilteredUsers([]);
+            return;
+        }
+        setLoading(true);
+        const handle = setTimeout(async () => {
+            try {
+                const results = await db.searchUsersByUsername(trimmed);
+                setFilteredUsers(results);
+            } finally {
+                setLoading(false);
+            }
+        }, 250);
+        return () => clearTimeout(handle);
+    }, [query, user]);
 
     return (
         <div className="container mx-auto p-4 md:p-8 max-w-4xl">
@@ -48,8 +48,10 @@ const SearchPage: React.FC = () => {
                 />
             </div>
 
-            {loading ? (
-                <p className="text-center text-[var(--text-secondary)]">Cargando usuarios...</p>
+            {!user ? (
+                <p className="text-center text-[var(--text-secondary)]">Iniciá sesión para buscar usuarios.</p>
+            ) : loading ? (
+                <p className="text-center text-[var(--text-secondary)]">Buscando usuarios...</p>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredUsers.length > 0 ? (
@@ -64,7 +66,9 @@ const SearchPage: React.FC = () => {
                             </Link>
                         ))
                     ) : (
-                        <p className="col-span-full text-center text-[var(--text-secondary)] py-8">No se encontraron usuarios con ese nombre.</p>
+                        <p className="col-span-full text-center text-[var(--text-secondary)] py-8">
+                            {query.trim() ? 'No se encontraron usuarios con ese nombre.' : 'Escribí para buscar usuarios.'}
+                        </p>
                     )}
                 </div>
             )}

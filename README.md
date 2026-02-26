@@ -18,3 +18,13 @@ View your app in AI Studio: https://ai.studio/apps/drive/1WIFm6EMsuGHHMzg27WbSys
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+## Firebase deploy safety
+
+This web repo is configured to deploy only Hosting and Firestore rules/indexes.
+
+- Web deploy (safe): `npm run deploy:web`
+- Hosting only: `npm run deploy:hosting`
+- Rules and indexes only: `npm run deploy:rules`
+
+Cloud Functions for push and scheduled notifications are managed from the mobile/backend repo (`Boxbox-Mobile/functions`), not from this web repo.

@@ -222,10 +222,18 @@ const ProfilePage: React.FC = () => {
         }
         setUsernameError('');
 
-        if (trimmedUsername !== currentUser.username) {
-            const existingUser = await db.getUserByUsername(trimmedUsername);
-            if (existingUser && existingUser.id !== currentUser.id) {
-                setUsernameError('Este nombre de usuario ya está en uso.');
+        const normalizedCurrent = currentUser.username.trim().toLowerCase();
+        const normalizedNext = trimmedUsername.toLowerCase();
+
+        if (normalizedNext !== normalizedCurrent) {
+            try {
+                await db.reserveUsername(trimmedUsername, currentUser.id);
+            } catch (err: any) {
+                if (err?.name === 'auth/username-already-in-use') {
+                    setUsernameError('Este nombre de usuario ya está en uso.');
+                } else {
+                    setUsernameError('No se pudo reservar el nombre de usuario.');
+                }
                 return;
             }
         }
@@ -235,10 +243,20 @@ const ProfilePage: React.FC = () => {
             username: trimmedUsername,
             avatar: avatar
         };
-        await updateUser(updatedUser);
-        setProfileUser(updatedUser);
-        setIsEditing(false);
-        alert('Perfil actualizado con éxito.');
+        try {
+            await updateUser(updatedUser);
+            setProfileUser(updatedUser);
+            setIsEditing(false);
+            alert('Perfil actualizado con éxito.');
+            if (normalizedNext !== normalizedCurrent) {
+                await db.releaseUsername(currentUser.username, currentUser.id);
+            }
+        } catch (err) {
+            if (normalizedNext !== normalizedCurrent) {
+                await db.releaseUsername(trimmedUsername, currentUser.id).catch(() => {});
+            }
+            throw err;
+        }
     };
 
     const handleEditClick = () => {

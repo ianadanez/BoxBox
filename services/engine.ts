@@ -1,5 +1,5 @@
-import { GrandPrix, Prediction, OfficialResult, GpScore, SeasonTotal, User, PointAdjustment } from '../types';
-import { SCORING_RULES as RULES, LOCK_MINUTES_BEFORE } from '../constants';
+import { GrandPrix, Prediction, OfficialResult, GpScore, SeasonTotal, User, PointAdjustment, Team, ConstructorStanding } from '../types';
+import { SCORING_RULES as RULES, LOCK_MINUTES_BEFORE, CONSTRUCTORS_SCORING_RULES } from '../constants';
 
 export const engine = {
     /**
@@ -158,5 +158,55 @@ export const engine = {
 
         // 4. Retornar array ordenado
         return Object.values(scores).sort((a, b) => b.totalPoints - a.totalPoints);
+    },
+
+    /**
+     * Calcula la tabla de constructores paralela.
+     * Regla: cada usuario aporta 1 punto a su equipo por cada 10 puntos propios.
+     */
+    calculateConstructorsStandings: (
+        teams: Team[],
+        users: User[],
+        seasonStandings: SeasonTotal[],
+        seasonId?: string
+    ): ConstructorStanding[] => {
+        const standingsByUserId = new Map(seasonStandings.map(standing => [standing.userId, standing]));
+        const teamStandings = new Map<string, ConstructorStanding>();
+
+        teams.forEach(team => {
+            teamStandings.set(team.id, {
+                teamId: team.id,
+                teamName: team.name,
+                teamColor: team.color,
+                totalPoints: 0,
+                supporters: 0,
+                sourceUserPoints: 0,
+            });
+        });
+
+        users.forEach(user => {
+            if (!user.favoriteTeamId) return;
+            if (seasonId && user.favoriteTeamSeason && user.favoriteTeamSeason !== seasonId) return;
+
+            const teamStanding = teamStandings.get(user.favoriteTeamId);
+            if (!teamStanding) return;
+
+            const userSeasonStanding = standingsByUserId.get(user.id);
+            const userPoints = Math.max(0, userSeasonStanding?.totalPoints || 0);
+            const constructorPoints =
+                Math.floor(userPoints / CONSTRUCTORS_SCORING_RULES.userPointsStep) *
+                CONSTRUCTORS_SCORING_RULES.constructorPointsPerStep;
+
+            teamStanding.supporters += 1;
+            teamStanding.sourceUserPoints += userPoints;
+            teamStanding.totalPoints += constructorPoints;
+        });
+
+        return Array.from(teamStandings.values()).sort((a, b) => {
+            if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+            if (b.sourceUserPoints !== a.sourceUserPoints) return b.sourceUserPoints - a.sourceUserPoints;
+            if (b.supporters !== a.supporters) return b.supporters - a.supporters;
+            return a.teamName.localeCompare(b.teamName);
+        });
     }
 };

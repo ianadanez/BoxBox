@@ -38,6 +38,16 @@ service cloud.firestore {
       allow write: if isOwner(userId) || isAdmin();
     }
 
+    // USERNAMES:
+    // Reserve usernames as documents keyed by lowercase username.
+    match /usernames/{usernameId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+                    && request.resource.data.uid == request.auth.uid
+                    && !exists(/databases/$(database)/documents/usernames/$(usernameId));
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+    }
+
     // TEAMS & DRIVERS & SCHEDULE:
     // These are now subcollections of a season. Rules need to be nested.
     // This is handled by the season-specific rule below.
@@ -83,6 +93,12 @@ service cloud.firestore {
         allow write: if isAdmin();
     }
 
+    // PUBLIC GP STANDINGS (subcollection)
+    match /seasons/{seasonId}/public_gp_standings/{gpId}/standings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // --- Root Level Collections (Non-Seasonal) ---
 
     // NOTIFICATIONS:
@@ -91,6 +107,16 @@ service cloud.firestore {
       allow read: if isSignedIn() && (resource.data.toUserId == request.auth.uid || resource.data.fromUserId == request.auth.uid);
       allow create: if isSignedIn(); // Users create notifications (pokes, invites) for others
       allow update, delete: if isSignedIn() && resource.data.toUserId == request.auth.uid;
+    }
+
+    // SCHEDULED NOTIFICATIONS (admin only)
+    match /scheduled_notifications/{notificationId} {
+      allow read, write: if isAdmin();
+    }
+
+    // SETTINGS (admin only)
+    match /settings/{docId} {
+      allow read, write: if isAdmin();
     }
   }
 }

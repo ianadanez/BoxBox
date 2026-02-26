@@ -1,5 +1,5 @@
 
-import { User, Team, Driver, GrandPrix, Prediction, OfficialResult, Result, Tournament, GpScore, SeasonTotal, PointAdjustment, Notification, ResultsNotification, TournamentInviteNotification, TournamentInviteAcceptedNotification, TournamentInviteDeclinedNotification, PokeNotification, PointsAdjustmentNotification, Season, PublicStanding } from '../types';
+import { User, Team, Driver, GrandPrix, Prediction, OfficialResult, Result, Tournament, GpScore, SeasonTotal, PointAdjustment, Notification, ResultsNotification, TournamentInviteNotification, TournamentInviteAcceptedNotification, TournamentInviteDeclinedNotification, PokeNotification, PointsAdjustmentNotification, Season, PublicStanding, PublicConstructorStanding, ConstructorStanding, NotificationSettings, ScheduledNotification } from '../types';
 import { TEAMS, DRIVERS, GP_SCHEDULE } from '../constants';
 import { engine } from './engine';
 // Import the season service functions
@@ -18,9 +18,13 @@ const allowClientSeed = env.VITE_ALLOW_CLIENT_SEED === 'true';
 
 // --- Top-Level Collection References ---
 const usersCol = firestore.collection('users');
+const usernamesCol = firestore.collection('usernames');
 const notificationsCol = firestore.collection('notifications');
+const settingsCol = firestore.collection('settings');
+const scheduledNotificationsCol = firestore.collection('scheduled_notifications');
 const seasonsCol = firestore.collection('seasons'); // New collection ref
 const publicLeaderboardCol = (seasonId: string) => firestore.collection(`seasons/${seasonId}/public_leaderboard`);
+const publicConstructorsLeaderboardCol = (seasonId: string) => firestore.collection(`seasons/${seasonId}/public_constructors_leaderboard`);
 const publicGpStandingsCol = (seasonId: string, gpId: number) => firestore.collection(`seasons/${seasonId}/public_gp_standings/${gpId}/standings`);
 
 
@@ -59,6 +63,9 @@ const applyUsernameFallback = (user: User): User => {
     }
     return user;
 };
+
+const normalizeUsername = (username: string): string => username.trim().toLowerCase();
+const notificationSettingsRef = settingsCol.doc('notifications');
 
 
 // --- Firestore DB Service Implementation ---
@@ -100,6 +107,120 @@ export const db = {
   saveUser: async (user: User): Promise<void> => {
       const docRef = usersCol.doc(user.id);
       await docRef.set(user, { merge: true });
+  },
+  reserveUsername: async (username: string, uid: string): Promise<void> => {
+      const normalized = normalizeUsername(username);
+      const docRef = usernamesCol.doc(normalized);
+      await firestore.runTransaction(async (tx) => {
+          const snap = await tx.get(docRef);
+          if (snap.exists) {
+              const existing = snap.data() as { uid?: string } | undefined;
+              if (existing?.uid && existing.uid === uid) {
+                  return;
+              }
+              const error = new Error('El nombre de usuario ya está en uso.');
+              (error as any).name = 'auth/username-already-in-use';
+              throw error;
+          }
+          tx.set(docRef, {
+              uid,
+              username: username.trim(),
+              usernameLower: normalized,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          });
+      });
+  },
+  releaseUsername: async (username: string, uid?: string): Promise<void> => {
+      const normalized = normalizeUsername(username);
+      const docRef = usernamesCol.doc(normalized);
+      await firestore.runTransaction(async (tx) => {
+          const snap = await tx.get(docRef);
+          if (!snap.exists) return;
+          if (uid) {
+              const data = snap.data() as { uid?: string } | undefined;
+              if (data?.uid && data.uid !== uid) return;
+          }
+          tx.delete(docRef);
+      });
+  },
+  searchUsersByUsername: async (query: string, limit = 20): Promise<User[]> => {
+      const normalized = normalizeUsername(query);
+      if (!normalized) return [];
+      const snapshot = await usernamesCol
+          .orderBy('usernameLower')
+          .startAt(normalized)
+          .endAt(`${normalized}\uf8ff`)
+          .limit(limit)
+          .get();
+
+      if (snapshot.empty) return [];
+
+      const entries = snapshot.docs.map(doc => doc.data() as { uid?: string; username?: string });
+      const ids = entries.map(entry => entry.uid).filter(Boolean) as string[];
+      if (ids.length === 0) return [];
+
+      const users = await db.getUsersByIds(ids);
+      const userMap = new Map(users.map(user => [user.id, user]));
+
+      return entries
+          .map(entry => (entry.uid ? userMap.get(entry.uid) : undefined))
+          .filter(Boolean) as User[];
+  },
+  getNotificationSettings: async (): Promise<NotificationSettings> => {
+      const snap = await notificationSettingsRef.get();
+      const data = snap.exists ? (snap.data() as NotificationSettings) : undefined;
+      return {
+          pushMirrorEnabled: data?.pushMirrorEnabled ?? true,
+          predictionReminderEnabled: data?.predictionReminderEnabled ?? false,
+          predictionReminderOffsets: data?.predictionReminderOffsets ?? [24],
+          predictionReminderSessions: data?.predictionReminderSessions ?? ['quali', 'sprint_qualy'],
+          predictionReminderTitle: data?.predictionReminderTitle ?? '⏰ Recordatorio {sessionName}',
+          predictionReminderBody: data?.predictionReminderBody ?? 'No olvides completar tu predicción para {gpName}. Faltan {hours}h.',
+          updatedAt: data?.updatedAt,
+          updatedBy: data?.updatedBy,
+      };
+  },
+  saveNotificationSettings: async (settings: NotificationSettings, adminId: string): Promise<void> => {
+      await notificationSettingsRef.set(
+          {
+              ...settings,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+              updatedBy: adminId,
+          },
+          { merge: true }
+      );
+  },
+  createScheduledNotification: async (payload: {
+      title: string;
+      body: string;
+      scheduledAt: Date;
+      audience: { type: 'all' } | { type: 'uids'; uids: string[] };
+      data?: Record<string, unknown>;
+      createdBy?: string;
+  }): Promise<void> => {
+      await scheduledNotificationsCol.add({
+          title: payload.title,
+          body: payload.body,
+          scheduledAt: firebase.firestore.Timestamp.fromDate(payload.scheduledAt),
+          status: 'pending',
+          audience: payload.audience,
+          data: payload.data ?? {},
+          createdBy: payload.createdBy ?? null,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+  },
+  listScheduledNotifications: async (limitCount = 20): Promise<ScheduledNotification[]> => {
+      const snap = await scheduledNotificationsCol
+          .orderBy('scheduledAt', 'desc')
+          .limit(limitCount)
+          .get();
+      return snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as ScheduledNotification) }));
+  },
+  cancelScheduledNotification: async (id: string): Promise<void> => {
+      await scheduledNotificationsCol.doc(id).update({
+          status: 'cancelled',
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
   },
 
   // --- SEASON MANAGEMENT ---
@@ -292,9 +413,82 @@ export const db = {
       const snapshot = await publicLeaderboardCol(seasonId).orderBy('totalPoints', 'desc').get();
       return snapshot.docs.map(doc => doc.data() as PublicStanding);
   },
+  getPublicConstructorsLeaderboard: async (seasonId: string): Promise<PublicConstructorStanding[]> => {
+      const snapshot = await publicConstructorsLeaderboardCol(seasonId).orderBy('totalPoints', 'desc').get();
+      return snapshot.docs.map(doc => doc.data() as PublicConstructorStanding);
+  },
+  getPublicConstructorsLeaderboardForActiveSeason: async (): Promise<PublicConstructorStanding[]> => {
+      const seasonId = await getActiveSeason();
+      if (!seasonId) return [];
+      const snapshot = await publicConstructorsLeaderboardCol(seasonId).orderBy('totalPoints', 'desc').get();
+      return snapshot.docs.map(doc => doc.data() as PublicConstructorStanding);
+  },
   getPublicGpStandings: async (seasonId: string, gpId: number): Promise<PublicStanding[]> => {
       const snapshot = await publicGpStandingsCol(seasonId, gpId).orderBy('totalPoints', 'desc').get();
       return snapshot.docs.map(doc => doc.data() as PublicStanding);
+  },
+  publishPublicGpStandings: async (gpId: number, seasonIdOverride?: string): Promise<number> => {
+      const seasonId = seasonIdOverride || await getActiveSeason();
+      if (!seasonId) throw new Error('No hay temporada activa para publicar standings por GP.');
+
+      const [predictionsSnap, resultSnap, gpSnap] = await Promise.all([
+          firestore.collection(`seasons/${seasonId}/predictions`).where('gpId', '==', gpId).get(),
+          firestore.collection(`seasons/${seasonId}/results`).doc(String(gpId)).get(),
+          firestore.collection(`seasons/${seasonId}/schedule`).doc(String(gpId)).get(),
+      ]);
+
+      if (!resultSnap.exists) {
+          console.warn(`No hay resultado oficial para GP ${gpId}. No se publican standings por GP.`);
+          return 0;
+      }
+
+      const result = resultSnap.data() as OfficialResult;
+      const gp: GrandPrix = gpSnap.exists
+          ? (gpSnap.data() as GrandPrix)
+          : {
+              id: gpId,
+              name: `GP ${gpId}`,
+              country: '',
+              track: '',
+              events: { quali: '', race: '' },
+              hasSprint: !!result.sprintPole || !!result.sprintPodium,
+          };
+
+      const predictions = predictionsSnap.docs.map(d => d.data() as Prediction);
+      const userIds = [...new Set(predictions.map(p => p.userId))];
+      const users = await db.getUsersByIds(userIds);
+      const userMap = new Map(users.map(u => [u.id, u]));
+
+      const standings: PublicStanding[] = predictions.map(prediction => {
+          const user = userMap.get(prediction.userId);
+          if (!user) return null;
+          const score = engine.calculateGpScore(gp, prediction, result);
+          const details = {
+              exactPole: result.pole && result.pole === prediction.pole ? 1 : 0,
+              exactFastestLap: result.fastestLap && result.fastestLap === prediction.fastestLap ? 1 : 0,
+              exactP1: result.racePodium && prediction.racePodium && result.racePodium[0] === prediction.racePodium[0] ? 1 : 0,
+          };
+          return {
+              userId: user.id,
+              userUsername: user.username,
+              userAvatar: user.avatar,
+              totalPoints: score.totalPoints,
+              details,
+          } as PublicStanding;
+      }).filter(Boolean) as PublicStanding[];
+
+      const colRef = publicGpStandingsCol(seasonId, gpId);
+      const batch = firestore.batch();
+      const existing = await colRef.get();
+      existing.forEach(doc => batch.delete(doc.ref));
+
+      standings.forEach(s => {
+          const docRef = colRef.doc(s.userId || colRef.doc().id);
+          batch.set(docRef, s);
+      });
+
+      await batch.commit();
+      return standings.length;
   },
   savePrediction: async (prediction: Prediction): Promise<void> => {
       const predictionsCol = await getSeasonCollection('predictions');
@@ -412,6 +606,8 @@ export const db = {
         }
     }
     await batch.commit();
+    // Refresh GP public standings for this GP.
+    await db.publishPublicGpStandings(result.gpId);
   },
 
 

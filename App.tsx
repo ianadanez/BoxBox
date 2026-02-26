@@ -24,6 +24,7 @@ const HowToPlayPage = React.lazy(() => import('./pages/HowToPlayPage'));
 const EmailVerificationPage = React.lazy(() => import('./pages/EmailVerificationPage'));
 const OffSeasonPage = React.lazy(() => import('./pages/OffSeasonPage'));
 const SeasonWrappedPage = React.lazy(() => import('./pages/SeasonWrappedPage'));
+const LeaderboardPage = React.lazy(() => import('./pages/LeaderboardPage'));
 
 const PrivateRoute: React.FC<{ children: React.ReactNode, adminOnly?: boolean }> = ({ children, adminOnly = false }) => {
     const { user, loading } = useAuth();
@@ -60,6 +61,7 @@ const AppRoutes: React.FC = () => {
             <Route path="/search" element={<SearchPage />} />
             <Route path="/profile/:userId" element={<ProfilePage />} />
             <Route path="/how-to-play" element={<HowToPlayPage />} />
+            <Route path="/leaderboard" element={<LeaderboardPage />} />
             <Route path="/predict/:gpId" element={<PrivateRoute><PredictionsPage /></PrivateRoute>} />
             <Route path="/tournaments" element={<PrivateRoute><TournamentsPage /></PrivateRoute>} />
             <Route path="/results/:userId/:gpId" element={<PrivateRoute><ResultsReviewPage /></PrivateRoute>} />

@@ -71,9 +71,8 @@ const HomePage: React.FC = () => {
         teams: Team[];
     }>({ lastGp: null, nextGp: null, lastResult: null, leaderboard: [], drivers: [], teams: [] });
     const [loading, setLoading] = useState(true);
-    const [currentPage, setCurrentPage] = useState(0);
 
-    const USERS_PER_PAGE = 10;
+    const TOP_LEADERBOARD_LIMIT = 10;
     
     useEffect(() => {
         const fetchData = async () => {
@@ -133,24 +132,7 @@ const HomePage: React.FC = () => {
         fetchData();
     }, []);
 
-    const totalPages = Math.ceil(data.leaderboard.length / USERS_PER_PAGE);
-    const paginatedLeaderboard = data.leaderboard.slice(
-        currentPage * USERS_PER_PAGE,
-        (currentPage + 1) * USERS_PER_PAGE
-    );
-
-    const handlePrevPage = () => setCurrentPage(prev => Math.max(0, prev - 1));
-    const handleNextPage = () => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1));
-    
-    const handleGoToMyPosition = () => {
-        if (user) {
-            const userIndex = data.leaderboard.findIndex(s => s.userId === user.id);
-            if (userIndex !== -1) {
-                const userPage = Math.floor(userIndex / USERS_PER_PAGE);
-                setCurrentPage(userPage);
-            }
-        }
-    };
+    const topLeaderboard = data.leaderboard.slice(0, TOP_LEADERBOARD_LIMIT);
 
     if (authLoading || loading) {
         return <div className="text-center p-8">Cargando...</div>;
@@ -209,7 +191,7 @@ const HomePage: React.FC = () => {
                     )}
                 </div>
                 <div className="lg:col-span-2 bg-[var(--background-medium)] p-6 rounded-xl border border-[var(--border-color)]">
-                    <h2 className="text-2xl font-bold mb-4 f1-red-text">Tabla General de la Temporada</h2>
+                    <h2 className="text-2xl font-bold mb-4 f1-red-text">Tabla General de la Temporada (Top 10)</h2>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
                             <thead className="border-b-2 border-[var(--border-color)]">
@@ -222,40 +204,34 @@ const HomePage: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {paginatedLeaderboard.map((score, index) => (
-                                    <tr key={score.userId} className="border-b border-[var(--border-color)]">
-                                        <td className="p-3 text-lg font-bold text-center text-[var(--text-secondary)]">{(currentPage * USERS_PER_PAGE) + index + 1}</td>
+                                {topLeaderboard.map((score, index) => {
+                                    const isHighlighted = Boolean(user && score.userId === user.id);
+                                    return (
+                                    <tr key={score.userId} className={`border-b border-[var(--border-color)] ${isHighlighted ? 'bg-[var(--accent-red)]/15' : ''}`}>
+                                        <td className={`p-3 text-lg font-bold text-center text-[var(--text-secondary)] ${isHighlighted ? 'border-l-4 border-[var(--accent-red)]' : ''}`}>{index + 1}</td>
                                         <td className="p-2 font-medium">
                                             <Link to={`/profile/${score.userId}`} className="flex items-center space-x-3 group">
                                                 <Avatar avatar={score.userAvatar} className="w-10 h-10" />
-                                                <span className="group-hover:text-[var(--accent-red)] transition-colors">{score.userUsername}</span>
+                                                <span className="group-hover:text-[var(--accent-red)] transition-colors">
+                                                    {score.userUsername}
+                                                    {isHighlighted && (
+                                                        <span className="ml-2 text-xs font-semibold text-[var(--accent-red)]">· Tú</span>
+                                                    )}
+                                                </span>
                                             </Link>
                                         </td>
                                         <td className="p-3 text-right font-mono text-lg font-bold text-[var(--accent-blue)]">{score.totalPoints}</td>
                                         <td className="hidden md:table-cell p-3 text-center font-mono text-gray-400">{score.details.exactP1}</td>
                                         <td className="hidden md:table-cell p-3 text-center font-mono text-gray-400">{score.details.exactPole}</td>
                                     </tr>
-                                ))}
+                                )})}
                             </tbody>
                         </table>
                     </div>
-                     <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-                        <div className="flex items-center gap-2">
-                             <button onClick={handlePrevPage} disabled={currentPage === 0} className="px-4 py-2 text-sm font-medium rounded-md bg-[var(--background-light)] hover:bg-[var(--border-color)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                                Anterior
-                            </button>
-                            <span className="text-sm text-[var(--text-secondary)]">
-                                Página {currentPage + 1} de {totalPages}
-                            </span>
-                            <button onClick={handleNextPage} disabled={currentPage >= totalPages - 1} className="px-4 py-2 text-sm font-medium rounded-md bg-[var(--background-light)] hover:bg-[var(--border-color)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                                Siguiente
-                            </button>
-                        </div>
-                        {user && data.leaderboard.some(s => s.userId === user.id) && (
-                             <button onClick={handleGoToMyPosition} className="px-4 py-2 text-sm font-bold rounded-md bg-[var(--accent-blue)] text-black hover:opacity-80 transition-opacity">
-                                Ver mi posición
-                            </button>
-                        )}
+                    <div className="mt-4 flex justify-end">
+                        <Link to="/leaderboard" className="px-4 py-2 text-sm font-bold rounded-md bg-[var(--accent-blue)] text-black hover:opacity-80 transition-opacity">
+                            Ver tabla completa
+                        </Link>
                     </div>
                      <div className="mt-8">
                         <GoogleAd slot="3093952327" />

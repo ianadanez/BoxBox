@@ -24,6 +24,8 @@ interface StandingsTableProps<T extends StandingEntry> {
     actionButtonLabel?: string;
     onActionClick?: (item: T) => void;
     renderUserCell?: (item: T) => React.ReactNode;
+    highlightUserId?: string;
+    highlightLabel?: string;
 }
 
 /**
@@ -40,6 +42,8 @@ const StandingsTable = <T extends StandingEntry>({
     actionButtonLabel,
     onActionClick,
     renderUserCell,
+    highlightUserId,
+    highlightLabel = '· Tú',
 }: StandingsTableProps<T>) => {
     if (!standings || standings.length === 0) {
         return <p className="text-center text-gray-400">{emptyMessage}</p>;
@@ -68,9 +72,14 @@ const StandingsTable = <T extends StandingEntry>({
                         </tr>
                     </thead>
                     <tbody>
-                        {pageData.map((item, index) => (
-                            <tr key={`${item.userId}-${index}`} className="border-b border-[var(--border-color)]">
-                                <td className="p-3 text-lg font-bold text-center text-[var(--text-secondary)]">
+                        {pageData.map((item, index) => {
+                            const isHighlighted = Boolean(highlightUserId && item.userId === highlightUserId);
+                            return (
+                            <tr
+                                key={`${item.userId}-${index}`}
+                                className={`border-b border-[var(--border-color)] ${isHighlighted ? 'bg-[var(--accent-red)]/15' : ''}`}
+                            >
+                                <td className={`p-3 text-lg font-bold text-center text-[var(--text-secondary)] ${isHighlighted ? 'border-l-4 border-[var(--accent-red)]' : ''}`}>
                                     {(currentPage * perPage) + index + 1}
                                 </td>
                                 <td className="p-2 font-medium">
@@ -81,6 +90,11 @@ const StandingsTable = <T extends StandingEntry>({
                                             <Avatar avatar={item.userAvatar} className="w-10 h-10" />
                                             <span className="group-hover:text-[var(--accent-red)] transition-colors">
                                                 {item.userUsername || 'N/A'}
+                                                {isHighlighted && (
+                                                    <span className="ml-2 text-xs font-semibold text-[var(--accent-red)]">
+                                                        {highlightLabel}
+                                                    </span>
+                                                )}
                                             </span>
                                         </div>
                                     )}
@@ -105,7 +119,7 @@ const StandingsTable = <T extends StandingEntry>({
                                     </td>
                                 )}
                             </tr>
-                        ))}
+                        )})}
                     </tbody>
                 </table>
             </div>

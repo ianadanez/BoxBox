@@ -130,11 +130,17 @@ const OffSeasonPage: React.FC = () => {
                 perPage={USERS_PER_PAGE}
                 onPageChange={setSeasonPage}
                 emptyMessage="Aún no hay tabla de la temporada."
+                highlightUserId={user?.id}
                 renderUserCell={(item) =>
                     item.userId ? (
                         <Link to={`/profile/${item.userId}`} className="flex items-center space-x-3 group">
                             <Avatar avatar={item.userAvatar} className="w-10 h-10" />
-                            <span className="group-hover:text-[var(--accent-red)] transition-colors">{item.userUsername}</span>
+                            <span className="group-hover:text-[var(--accent-red)] transition-colors">
+                                {item.userUsername}
+                                {user?.id === item.userId && (
+                                    <span className="ml-2 text-xs font-semibold text-[var(--accent-red)]">· Tú</span>
+                                )}
+                            </span>
                         </Link>
                     ) : (
                         <div className="flex items-center space-x-3">
@@ -159,11 +165,17 @@ const OffSeasonPage: React.FC = () => {
                 emptyMessage="No hay tabla para este GP."
                 actionButtonLabel="Ver predicción"
                 onActionClick={(item) => setViewingPredictionFor(item)}
+                highlightUserId={user?.id}
                 renderUserCell={(item) =>
                     item.userId ? (
                         <Link to={`/profile/${item.userId}`} className="flex items-center space-x-3 group">
                             <Avatar avatar={item.userAvatar} className="w-10 h-10" />
-                            <span className="group-hover:text-[var(--accent-red)] transition-colors">{item.userUsername}</span>
+                            <span className="group-hover:text-[var(--accent-red)] transition-colors">
+                                {item.userUsername}
+                                {user?.id === item.userId && (
+                                    <span className="ml-2 text-xs font-semibold text-[var(--accent-red)]">· Tú</span>
+                                )}
+                            </span>
                         </Link>
                     ) : (
                         <div className="flex items-center space-x-3">
