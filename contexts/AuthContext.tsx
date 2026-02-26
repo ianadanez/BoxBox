@@ -4,6 +4,7 @@ import { db } from '../services/db';
 import { getActiveSeason } from '../services/seasonService';
 import { auth } from '../firebaseConfig';
 import { appendFavoriteTeamAssignment } from '../services/favoriteTeamHistory';
+import { reportClientError } from '../services/monitoring';
 // FIX: Removed modular auth imports to use compat API with the compat auth instance.
 
 interface RegisterDetails {
@@ -51,6 +52,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     }
                 } catch (error) {
                     console.error("Error fetching user profile from Firestore:", error);
+                    void reportClientError("auth.loadProfile", error, {
+                        uid: firebaseUser.uid,
+                    });
                     setUser(null);
                 }
             } else {

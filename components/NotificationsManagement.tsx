@@ -20,6 +20,19 @@ const formatTimestamp = (value: any) => {
     return date.toLocaleString();
 };
 
+const formatDeliveryStatus = (item: ScheduledNotification) => {
+    const status = item.pushReceiptStatus;
+    if (!status) {
+        if (item.status === 'sent') return 'enviada';
+        return '-';
+    }
+    if (status === 'delivered') return 'entregada';
+    if (status === 'partial') return 'parcial';
+    if (status === 'error') return 'error';
+    if (status === 'pending') return 'pendiente';
+    return status;
+};
+
 const NotificationsManagement: React.FC = () => {
     const { user } = useAuth();
     const [settings, setSettings] = useState<NotificationSettings>(DEFAULT_SETTINGS);
@@ -392,8 +405,10 @@ const NotificationsManagement: React.FC = () => {
                                 <tr>
                                     <th className="p-3">Título</th>
                                     <th className="p-3">Estado</th>
+                                    <th className="p-3">Entrega</th>
                                     <th className="p-3">Programada</th>
                                     <th className="p-3">Audiencia</th>
+                                    <th className="p-3">Aperturas</th>
                                     <th className="p-3 text-right">Acciones</th>
                                 </tr>
                             </thead>
@@ -402,12 +417,21 @@ const NotificationsManagement: React.FC = () => {
                                     <tr key={item.id} className="border-b border-[var(--border-color)]">
                                         <td className="p-3 font-medium">{item.title}</td>
                                         <td className="p-3 text-sm text-[var(--text-secondary)]">{item.status ?? 'pending'}</td>
+                                        <td className="p-3 text-sm text-[var(--text-secondary)]">
+                                            {formatDeliveryStatus(item)}
+                                            {typeof item.pushReceiptOkCount === 'number' || typeof item.pushReceiptErrorCount === 'number' ? (
+                                                <div className="text-xs text-[var(--text-secondary)] mt-1">
+                                                    ok: {item.pushReceiptOkCount ?? 0} / err: {item.pushReceiptErrorCount ?? 0}
+                                                </div>
+                                            ) : null}
+                                        </td>
                                         <td className="p-3 text-sm">{formatTimestamp(item.scheduledAt)}</td>
                                         <td className="p-3 text-sm">
                                             {item.audience?.type === 'uids'
                                                 ? `Usuarios (${item.audience.uids?.length ?? 0})`
                                                 : 'Todos'}
                                         </td>
+                                        <td className="p-3 text-sm text-[var(--text-secondary)]">{item.pushOpenedCount ?? 0}</td>
                                         <td className="p-3 text-right">
                                             {item.status === 'pending' && (
                                                 <button

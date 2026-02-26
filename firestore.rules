@@ -118,5 +118,12 @@ service cloud.firestore {
     match /settings/{docId} {
       allow read, write: if isAdmin();
     }
+
+    // PUSH OPEN EVENTS:
+    // Clients create an event when opening a scheduled push.
+    match /push_open_events/{eventId} {
+      allow create: if isSignedIn() && request.resource.data.openedBy == request.auth.uid;
+      allow read, update, delete: if isAdmin();
+    }
   }
 }

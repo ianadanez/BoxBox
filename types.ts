@@ -50,6 +50,11 @@ export interface ScheduledNotification {
   createdBy?: string;
   error?: string;
   sendCount?: number;
+  pushReceiptStatus?: 'none' | 'pending' | 'delivered' | 'partial' | 'error';
+  pushReceiptOkCount?: number;
+  pushReceiptErrorCount?: number;
+  pushReceiptPendingCount?: number;
+  pushOpenedCount?: number;
 }
 
 export interface Avatar {

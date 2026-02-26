@@ -12,6 +12,7 @@ import { getActiveSeason, listenToActiveSeason } from '../services/seasonService
 import { engine } from '../services/engine';
 import { appendFavoriteTeamAssignment, normalizeFavoriteTeamHistory } from '../services/favoriteTeamHistory';
 import { COUNTRY_OPTIONS, countryCodeToFlagEmoji, getCountryNameByCode } from '../services/countries';
+import { reportClientError } from '../services/monitoring';
 
 const normalizeTeamColor = (value?: string) => {
     if (!value) return null;
@@ -332,10 +333,14 @@ const ProfilePage: React.FC = () => {
                 await db.releaseUsername(currentUser.username, currentUser.id);
             }
         } catch (err) {
+            void reportClientError("profile.save", err, {
+                userId: currentUser.id,
+                editingOwnProfile: isOwnProfile,
+            });
             if (normalizedNext !== normalizedCurrent) {
                 await db.releaseUsername(trimmedUsername, currentUser.id).catch(() => {});
             }
-            throw err;
+            alert('No se pudo guardar el perfil. Intenta nuevamente.');
         }
     };
 
