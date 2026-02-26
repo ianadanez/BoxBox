@@ -67,6 +67,27 @@ const applyUsernameFallback = (user: User): User => {
 const normalizeUsername = (username: string): string => username.trim().toLowerCase();
 const notificationSettingsRef = settingsCol.doc('notifications');
 
+const stripUndefinedDeep = (value: any): any => {
+  if (value === undefined) return undefined;
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => stripUndefinedDeep(item))
+      .filter((item) => item !== undefined);
+  }
+  if (value && typeof value === "object") {
+    const proto = Object.getPrototypeOf(value);
+    if (proto === Object.prototype || proto === null) {
+      const out: Record<string, any> = {};
+      Object.entries(value).forEach(([key, nested]) => {
+        const cleaned = stripUndefinedDeep(nested);
+        if (cleaned !== undefined) out[key] = cleaned;
+      });
+      return out;
+    }
+  }
+  return value;
+};
+
 
 // --- Firestore DB Service Implementation ---
 export const db = {
@@ -106,7 +127,7 @@ export const db = {
   },
   saveUser: async (user: User): Promise<void> => {
       const docRef = usersCol.doc(user.id);
-      await docRef.set(user, { merge: true });
+      await docRef.set(stripUndefinedDeep(user), { merge: true });
   },
   reserveUsername: async (username: string, uid: string): Promise<void> => {
       const normalized = normalizeUsername(username);

@@ -18,6 +18,7 @@ export interface User {
   favoriteTeamId?: string;
   favoriteTeamSeason?: string; // temporada en la que se confirmó el favorito
   favoriteTeamHistory?: FavoriteTeamAssignment[];
+  countryCode?: string;
   createdAt: string;
 }
 

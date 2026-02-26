@@ -10,7 +10,77 @@ import { db } from '../services/db';
 import GoogleAd from '../components/common/GoogleAd';
 import { getActiveSeason, listenToActiveSeason } from '../services/seasonService';
 import { engine } from '../services/engine';
-import { appendFavoriteTeamAssignment } from '../services/favoriteTeamHistory';
+import { appendFavoriteTeamAssignment, normalizeFavoriteTeamHistory } from '../services/favoriteTeamHistory';
+import { COUNTRY_OPTIONS, countryCodeToFlagEmoji, getCountryNameByCode } from '../services/countries';
+
+const normalizeTeamColor = (value?: string) => {
+    if (!value) return null;
+    if (value.startsWith('bg-[') && value.endsWith(']')) {
+        return value.slice(4, -1);
+    }
+    return value.startsWith('#') || value.startsWith('rgb') ? value : null;
+};
+
+type Rgb = { r: number; g: number; b: number };
+
+const clamp = (value: number) => Math.max(0, Math.min(255, Math.round(value)));
+
+const parseColor = (value?: string | null): Rgb | null => {
+    const normalized = normalizeTeamColor(value || undefined);
+    if (!normalized) return null;
+
+    if (normalized.startsWith('#')) {
+        const hex = normalized.slice(1);
+        if (hex.length === 3) {
+            return {
+                r: parseInt(`${hex[0]}${hex[0]}`, 16),
+                g: parseInt(`${hex[1]}${hex[1]}`, 16),
+                b: parseInt(`${hex[2]}${hex[2]}`, 16),
+            };
+        }
+        if (hex.length === 6) {
+            return {
+                r: parseInt(hex.slice(0, 2), 16),
+                g: parseInt(hex.slice(2, 4), 16),
+                b: parseInt(hex.slice(4, 6), 16),
+            };
+        }
+        return null;
+    }
+
+    const rgbMatch = normalized.match(/^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/i);
+    if (!rgbMatch) return null;
+    return {
+        r: clamp(Number(rgbMatch[1])),
+        g: clamp(Number(rgbMatch[2])),
+        b: clamp(Number(rgbMatch[3])),
+    };
+};
+
+const mixWithWhite = (color: Rgb, amount: number): Rgb => ({
+    r: color.r + (255 - color.r) * amount,
+    g: color.g + (255 - color.g) * amount,
+    b: color.b + (255 - color.b) * amount,
+});
+
+const luminance = ({ r, g, b }: Rgb) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+const rgba = ({ r, g, b }: Rgb, alpha: number) => `rgba(${clamp(r)}, ${clamp(g)}, ${clamp(b)}, ${alpha})`;
+const hex = ({ r, g, b }: Rgb) =>
+    `#${clamp(r).toString(16).padStart(2, '0')}${clamp(g).toString(16).padStart(2, '0')}${clamp(b).toString(16).padStart(2, '0')}`;
+
+const getTeamChipPalette = (value?: string | null) => {
+    const base = parseColor(value);
+    if (!base) return null;
+    const baseLum = luminance(base);
+    const brightenAmount = baseLum < 0.2 ? 0.62 : baseLum < 0.4 ? 0.45 : 0.28;
+    const accent = mixWithWhite(base, brightenAmount);
+    return {
+        accent: hex(accent),
+        border: rgba(accent, 0.75),
+        background: rgba(base, 0.24),
+        glow: rgba(accent, 0.45),
+    };
+};
 
 const ProfilePage: React.FC = () => {
     const { userId } = useParams<{ userId: string }>();
@@ -20,6 +90,7 @@ const ProfilePage: React.FC = () => {
     const [profileUser, setProfileUser] = useState<User | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [username, setUsername] = useState('');
+    const [countryCode, setCountryCode] = useState('');
     const [usernameError, setUsernameError] = useState('');
     const [avatar, setAvatar] = useState<AvatarType | null>(null);
     const [stats, setStats] = useState<SeasonTotal | null>(null);
@@ -62,6 +133,7 @@ const ProfilePage: React.FC = () => {
 
                 setProfileUser(userToView);
                 setUsername(userToView.username);
+                setCountryCode((userToView.countryCode || '').toUpperCase());
                 setAvatar({
                     skinColor: '#C68642', color: '#6CD3BF', secondaryColor: '#FFFFFF',
                     eyes: 'normal', pattern: 'none', ...userToView.avatar,
@@ -243,12 +315,13 @@ const ProfilePage: React.FC = () => {
             ...currentUser,
             username: trimmedUsername,
             avatar: avatar,
+            countryCode: countryCode ? countryCode.toUpperCase() : "",
             favoriteTeamId: selectedFavoriteTeamId || currentUser.favoriteTeamId,
             favoriteTeamSeason: activeSeasonId || currentUser.favoriteTeamSeason,
             favoriteTeamHistory:
                 selectedFavoriteTeamId && selectedFavoriteTeamId !== currentUser.favoriteTeamId
                     ? appendFavoriteTeamAssignment(currentUser, selectedFavoriteTeamId)
-                    : currentUser.favoriteTeamHistory,
+                    : normalizeFavoriteTeamHistory(currentUser),
         };
         try {
             await updateUser(updatedUser);
@@ -310,6 +383,20 @@ const ProfilePage: React.FC = () => {
     }
     
     const resultsToShow = showAllResults ? gpScores : gpScores.slice(0, 3);
+    const favoriteTeam = teams.find((team) => team.id === profileUser.favoriteTeamId);
+    const countryFlag = countryCodeToFlagEmoji(profileUser.countryCode);
+    const countryName = getCountryNameByCode(profileUser.countryCode);
+    const favoriteTeamColor = normalizeTeamColor(favoriteTeam?.color);
+    const favoriteTeamPalette = getTeamChipPalette(favoriteTeamColor);
+    const favoriteChipStyle = favoriteTeamPalette
+        ? {
+              borderColor: favoriteTeamPalette.border,
+              backgroundColor: favoriteTeamPalette.background,
+              boxShadow: `0 0 14px ${favoriteTeamPalette.glow}`,
+          }
+        : undefined;
+    const favoriteChipTextStyle = favoriteTeamPalette ? { color: favoriteTeamPalette.accent } : undefined;
+    const favoriteDotStyle = favoriteTeamPalette ? { backgroundColor: favoriteTeamPalette.accent } : undefined;
 
     return (
         <div className="container mx-auto p-4 md:p-8 max-w-7xl">
@@ -360,6 +447,22 @@ const ProfilePage: React.FC = () => {
                                 {usernameError && <p className="text-sm text-red-400 mt-2">{usernameError}</p>}
                             </div>
                             <div>
+                                <label htmlFor="countryCode" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">País</label>
+                                <select
+                                    id="countryCode"
+                                    value={countryCode}
+                                    onChange={(e) => setCountryCode(e.target.value)}
+                                    className="w-full max-w-md bg-[var(--background-light)] border border-[var(--border-color)] rounded-md p-2.5 text-white focus:ring-2 focus:ring-[var(--accent-red)]"
+                                >
+                                    <option value="">Prefiero no decirlo</option>
+                                    {COUNTRY_OPTIONS.map((country) => (
+                                        <option key={country.code} value={country.code}>
+                                            {countryCodeToFlagEmoji(country.code)} {country.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
                                 <label htmlFor="favoriteTeam" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Escudería favorita (temporada {activeSeasonId || 'actual'})</label>
                                 <select
                                     id="favoriteTeam"
@@ -380,12 +483,28 @@ const ProfilePage: React.FC = () => {
                         <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-8">
                            {avatar && <Avatar avatar={avatar} className="w-40 h-40" />}
                            <div className="flex-grow text-center sm:text-left">
-                                <h2 className="text-4xl font-bold">{profileUser.username}</h2>
+                               <div className="flex items-center justify-center sm:justify-start gap-2">
+                                   <h2 className="text-4xl font-bold">{profileUser.username}</h2>
+                                   {countryFlag && <span className="text-3xl leading-none">{countryFlag}</span>}
+                               </div>
                                 <p className="text-[var(--text-secondary)]">Miembro desde {new Date(profileUser.createdAt).toLocaleDateString()}</p>
-                                {teams.length > 0 && profileUser.favoriteTeamId && (
-                                    <p className="text-sm text-[var(--text-secondary)] mt-1">
-                                        Escudería favorita: <span className="font-semibold text-white">{teams.find(t => t.id === profileUser.favoriteTeamId)?.name || '—'}</span>
-                                    </p>
+                                {countryName && <p className="text-[var(--text-secondary)]">{countryName}</p>}
+                                {favoriteTeam && (
+                                    <div
+                                        className="mt-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 bg-[rgba(225,29,72,0.15)] border-[rgba(225,29,72,0.35)]"
+                                        style={favoriteChipStyle}
+                                    >
+                                        <span
+                                            className="w-2 h-2 rounded-full bg-[#fda4af]"
+                                            style={favoriteDotStyle}
+                                        />
+                                        <span
+                                            className="text-xs font-bold text-[#fda4af]"
+                                            style={favoriteChipTextStyle}
+                                        >
+                                            {favoriteTeam.name}
+                                        </span>
+                                    </div>
                                 )}
                                 {isOwnProfile && (
                                     <button

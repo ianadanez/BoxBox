@@ -6,6 +6,7 @@ import { APP_NAME } from '../constants';
 import { Avatar as AvatarType, Team } from '../types';
 import AvatarEditor from '../components/common/AvatarEditor';
 import { db } from '../services/db';
+import { COUNTRY_OPTIONS, countryCodeToFlagEmoji } from '../services/countries';
 
 const getRandomAvatar = (): AvatarType => ({
     skinColor: '#C68642',
@@ -20,6 +21,7 @@ const RegisterPage: React.FC = () => {
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [countryCode, setCountryCode] = useState('');
     const [favoriteTeamId, setFavoriteTeamId] = useState('');
     const [avatar, setAvatar] = useState<AvatarType>(getRandomAvatar());
     const [teams, setTeams] = useState<Team[]>([]);
@@ -68,7 +70,7 @@ const RegisterPage: React.FC = () => {
             return;
         }
 
-        if (!email || !password || !favoriteTeamId) {
+        if (!email || !password || !favoriteTeamId || !countryCode) {
             setError("Todos los campos son requeridos.");
             return;
         }
@@ -81,7 +83,7 @@ const RegisterPage: React.FC = () => {
         setLoading(true);
 
         try {
-            await register({ username, email, password, favoriteTeamId, avatar });
+            await register({ username, email, password, countryCode, favoriteTeamId, avatar });
             setIsSuccess(true);
         } catch (err: any) {
             if (err.code === 'auth/email-already-in-use') {
@@ -143,6 +145,23 @@ const RegisterPage: React.FC = () => {
                             <select id="favoriteTeamId" value={favoriteTeamId} onChange={(e) => setFavoriteTeamId(e.target.value)} required
                                 className="mt-1 w-full px-3 py-2 text-white bg-[var(--background-light)] border border-[var(--border-color)] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-red)] focus:border-[var(--accent-red)]">
                                 {teams.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="md:col-span-2">
+                            <label htmlFor="countryCode" className="block text-sm font-medium text-[var(--text-secondary)]">País</label>
+                            <select
+                                id="countryCode"
+                                value={countryCode}
+                                onChange={(e) => setCountryCode(e.target.value)}
+                                required
+                                className="mt-1 w-full px-3 py-2 text-white bg-[var(--background-light)] border border-[var(--border-color)] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-red)] focus:border-[var(--accent-red)]"
+                            >
+                                <option value="">Selecciona tu país</option>
+                                {COUNTRY_OPTIONS.map((country) => (
+                                    <option key={country.code} value={country.code}>
+                                        {countryCodeToFlagEmoji(country.code)} {country.name}
+                                    </option>
+                                ))}
                             </select>
                         </div>
                     </div>

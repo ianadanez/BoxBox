@@ -10,6 +10,7 @@ interface RegisterDetails {
   username: string;
   email: string;
   password: string;
+  countryCode: string;
   favoriteTeamId: string;
   avatar: Avatar;
 }
@@ -118,6 +119,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // Do not store password
         role: 'user',
         avatar: details.avatar,
+        countryCode: details.countryCode.trim().toUpperCase(),
         favoriteTeamId: details.favoriteTeamId,
         favoriteTeamSeason: activeSeasonId || undefined,
         createdAt: new Date().toISOString(),
