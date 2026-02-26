@@ -151,7 +151,35 @@ const HowToPlayPage: React.FC = () => {
             </p>
         </section>
 
-        {/* Section 4: Tournaments & More */}
+        {/* Section 4: Constructors Championship */}
+        <section className="bg-[var(--background-medium)] p-6 rounded-xl border border-[var(--border-color)]">
+          <h2 className="text-3xl font-bold mb-4">🏗️ Campeonato de Constructores</h2>
+          <div className="text-[var(--text-secondary)] leading-relaxed space-y-4">
+            <p>
+              Además del campeonato individual de usuarios, también existe una tabla global de constructores.
+            </p>
+            <ul className="list-none space-y-4 pl-4">
+              <li className="flex items-start">
+                <ChevronRightIcon className="h-5 w-5 text-[var(--accent-red)] mr-2 flex-shrink-0 mt-1" />
+                <div><span className="font-semibold text-white">Conversión de puntos:</span> por cada <strong>10 puntos de predicción</strong> que sumas como usuario, aportas <strong>1 punto</strong> a tu escudería favorita.</div>
+              </li>
+              <li className="flex items-start">
+                <ChevronRightIcon className="h-5 w-5 text-[var(--accent-red)] mr-2 flex-shrink-0 mt-1" />
+                <div><span className="font-semibold text-white">Qué puntos cuentan:</span> solo se consideran puntos de predicciones. Los ajustes manuales no aportan a constructores.</div>
+              </li>
+              <li className="flex items-start">
+                <ChevronRightIcon className="h-5 w-5 text-[var(--accent-red)] mr-2 flex-shrink-0 mt-1" />
+                <div><span className="font-semibold text-white">Cambio de escudería:</span> si cambias tu equipo favorito, tus aportes nuevos empiezan a contar para el nuevo equipo desde ese momento.</div>
+              </li>
+              <li className="flex items-start">
+                <ChevronRightIcon className="h-5 w-5 text-[var(--accent-red)] mr-2 flex-shrink-0 mt-1" />
+                <div><span className="font-semibold text-white">Aporte mínimo:</span> nunca restas puntos; el aporte mínimo es 0.</div>
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        {/* Section 5: Tournaments & More */}
         <section className="bg-[var(--background-medium)] p-6 rounded-xl border border-[var(--border-color)]">
           <h2 className="text-3xl font-bold mb-4">🚀 Más Allá de la Pista</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-[var(--text-secondary)]">

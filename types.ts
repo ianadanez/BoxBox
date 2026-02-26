@@ -8,6 +8,53 @@ export interface Season {
   year?: number;
 }
 
+export interface SeasonImportPayload {
+  schedule: GrandPrix[];
+  teams: Team[];
+  drivers: Driver[];
+}
+
+export interface SeasonImportValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+  fieldErrors: Record<string, string[]>;
+}
+
+export interface SeasonImportCollectionDiff {
+  currentCount: number;
+  incomingCount: number;
+  toCreate: number;
+  toUpdate: number;
+  toDelete: number;
+  unchanged: number;
+}
+
+export interface SeasonImportDryRun {
+  seasonId: string;
+  generatedAt: string;
+  validation: SeasonImportValidationResult;
+  collections: {
+    schedule: SeasonImportCollectionDiff;
+    teams: SeasonImportCollectionDiff;
+    drivers: SeasonImportCollectionDiff;
+  };
+}
+
+export interface SeasonImportVersion {
+  id: string;
+  seasonId: string;
+  createdAt?: any;
+  createdBy?: string;
+  source?: string;
+  note?: string;
+  snapshotStats: {
+    scheduleCount: number;
+    teamsCount: number;
+    driversCount: number;
+  };
+}
+
 export interface User {
   id: string;
   username: string;

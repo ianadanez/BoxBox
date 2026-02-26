@@ -1,5 +1,35 @@
 
-import { User, Team, Driver, GrandPrix, Prediction, OfficialResult, Result, Tournament, GpScore, SeasonTotal, PointAdjustment, Notification, ResultsNotification, TournamentInviteNotification, TournamentInviteAcceptedNotification, TournamentInviteDeclinedNotification, PokeNotification, PointsAdjustmentNotification, Season, PublicStanding, PublicConstructorStanding, ConstructorStanding, NotificationSettings, ScheduledNotification } from '../types';
+import {
+  User,
+  Team,
+  Driver,
+  GrandPrix,
+  Prediction,
+  OfficialResult,
+  Result,
+  Tournament,
+  GpScore,
+  SeasonTotal,
+  PointAdjustment,
+  Notification,
+  ResultsNotification,
+  TournamentInviteNotification,
+  TournamentInviteAcceptedNotification,
+  TournamentInviteDeclinedNotification,
+  PokeNotification,
+  PointsAdjustmentNotification,
+  Season,
+  PublicStanding,
+  PublicConstructorStanding,
+  ConstructorStanding,
+  NotificationSettings,
+  ScheduledNotification,
+  SeasonImportPayload,
+  SeasonImportValidationResult,
+  SeasonImportDryRun,
+  SeasonImportCollectionDiff,
+  SeasonImportVersion,
+} from '../types';
 import { TEAMS, DRIVERS, GP_SCHEDULE } from '../constants';
 import { engine } from './engine';
 // Import the season service functions
@@ -26,6 +56,7 @@ const seasonsCol = firestore.collection('seasons'); // New collection ref
 const publicLeaderboardCol = (seasonId: string) => firestore.collection(`seasons/${seasonId}/public_leaderboard`);
 const publicConstructorsLeaderboardCol = (seasonId: string) => firestore.collection(`seasons/${seasonId}/public_constructors_leaderboard`);
 const publicGpStandingsCol = (seasonId: string, gpId: number) => firestore.collection(`seasons/${seasonId}/public_gp_standings/${gpId}/standings`);
+const seasonImportVersionsCol = (seasonId: string) => firestore.collection(`seasons/${seasonId}/import_versions`);
 
 
 // --- SEASON-AWARE HELPER ---
@@ -86,6 +117,297 @@ const stripUndefinedDeep = (value: any): any => {
     }
   }
   return value;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === "object" && !Array.isArray(value);
+
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === "string" && value.trim().length > 0;
+
+const parseIsoDate = (value: unknown): number | null => {
+  if (!isNonEmptyString(value)) return null;
+  const ms = Date.parse(value);
+  return Number.isNaN(ms) ? null : ms;
+};
+
+const sortObjectKeysDeep = (value: any): any => {
+  if (Array.isArray(value)) {
+    return value.map(sortObjectKeysDeep);
+  }
+  if (isRecord(value)) {
+    return Object.keys(value)
+      .sort()
+      .reduce<Record<string, any>>((acc, key) => {
+        acc[key] = sortObjectKeysDeep((value as Record<string, any>)[key]);
+        return acc;
+      }, {});
+  }
+  return value;
+};
+
+const stableSerialize = (value: any): string =>
+  JSON.stringify(sortObjectKeysDeep(stripUndefinedDeep(value)));
+
+const createImportValidationAccumulator = () => {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const fieldErrors: Record<string, string[]> = {};
+
+  const addError = (field: string, message: string) => {
+    errors.push(message);
+    if (!fieldErrors[field]) fieldErrors[field] = [];
+    fieldErrors[field].push(message);
+  };
+
+  const addWarning = (message: string) => {
+    warnings.push(message);
+  };
+
+  return { errors, warnings, fieldErrors, addError, addWarning };
+};
+
+const validateSeasonImportPayload = (payload: unknown): SeasonImportValidationResult => {
+  const { errors, warnings, fieldErrors, addError, addWarning } = createImportValidationAccumulator();
+
+  if (!isRecord(payload)) {
+    addError("payload", "El JSON de temporada debe ser un objeto.");
+    return { isValid: false, errors, warnings, fieldErrors };
+  }
+
+  const schedule = payload.schedule;
+  const teams = payload.teams;
+  const drivers = payload.drivers;
+
+  if (!Array.isArray(schedule)) addError("schedule", "El campo schedule debe ser un array.");
+  if (!Array.isArray(teams)) addError("teams", "El campo teams debe ser un array.");
+  if (!Array.isArray(drivers)) addError("drivers", "El campo drivers debe ser un array.");
+  if (!Array.isArray(schedule) || !Array.isArray(teams) || !Array.isArray(drivers)) {
+    return { isValid: false, errors, warnings, fieldErrors };
+  }
+
+  if (schedule.length === 0) addError("schedule", "schedule no puede estar vacio.");
+  if (teams.length === 0) addError("teams", "teams no puede estar vacio.");
+  if (drivers.length === 0) addError("drivers", "drivers no puede estar vacio.");
+
+  const gpIds = new Set<number>();
+  schedule.forEach((gp, index) => {
+    const path = `schedule[${index}]`;
+    if (!isRecord(gp)) {
+      addError(path, "Cada GP debe ser un objeto.");
+      return;
+    }
+    const gpId = gp.id;
+    if (!Number.isInteger(gpId) || Number(gpId) <= 0) {
+      addError(`${path}.id`, "id debe ser un numero entero positivo.");
+    } else {
+      if (gpIds.has(Number(gpId))) addError(`${path}.id`, `id duplicado: ${gpId}.`);
+      gpIds.add(Number(gpId));
+    }
+    if (!isNonEmptyString(gp.name)) addError(`${path}.name`, "name es obligatorio.");
+    if (!isNonEmptyString(gp.country)) addError(`${path}.country`, "country es obligatorio.");
+    if (!isNonEmptyString(gp.track)) addError(`${path}.track`, "track es obligatorio.");
+    if (typeof gp.hasSprint !== "boolean") {
+      addError(`${path}.hasSprint`, "hasSprint debe ser boolean.");
+    }
+    if (!isRecord(gp.events)) {
+      addError(`${path}.events`, "events debe ser un objeto.");
+      return;
+    }
+
+    const qualiMs = parseIsoDate(gp.events.quali);
+    const raceMs = parseIsoDate(gp.events.race);
+    if (qualiMs === null) addError(`${path}.events.quali`, "events.quali debe ser fecha ISO valida.");
+    if (raceMs === null) addError(`${path}.events.race`, "events.race debe ser fecha ISO valida.");
+    if (qualiMs !== null && raceMs !== null && qualiMs >= raceMs) {
+      addError(`${path}.events`, "La clasificacion debe ocurrir antes de la carrera.");
+    }
+
+    const hasSprint = gp.hasSprint === true;
+    const sprintQualiMs = parseIsoDate(gp.events.sprintQuali);
+    const sprintMs = parseIsoDate(gp.events.sprint);
+    if (hasSprint) {
+      if (sprintQualiMs === null) {
+        addError(`${path}.events.sprintQuali`, "Sprint Quali obligatoria cuando hasSprint=true.");
+      }
+      if (sprintMs === null) {
+        addError(`${path}.events.sprint`, "Sprint obligatorio cuando hasSprint=true.");
+      }
+    }
+    if (sprintQualiMs !== null && qualiMs !== null && sprintQualiMs > qualiMs) {
+      addWarning(`GP ${gpId || index + 1}: sprintQuali ocurre despues de quali.`);
+    }
+    if (sprintMs !== null && raceMs !== null && sprintMs > raceMs) {
+      addError(`${path}.events.sprint`, "Sprint no puede ser despues de la carrera.");
+    }
+  });
+
+  const teamIds = new Set<string>();
+  teams.forEach((team, index) => {
+    const path = `teams[${index}]`;
+    if (!isRecord(team)) {
+      addError(path, "Cada equipo debe ser un objeto.");
+      return;
+    }
+    const teamId = team.id;
+    if (!isNonEmptyString(teamId)) {
+      addError(`${path}.id`, "id es obligatorio.");
+      return;
+    }
+    if (teamIds.has(teamId)) addError(`${path}.id`, `id duplicado: ${teamId}.`);
+    teamIds.add(teamId);
+    if (!isNonEmptyString(team.name)) addError(`${path}.name`, "name es obligatorio.");
+    if (!isNonEmptyString(team.color)) addError(`${path}.color`, "color es obligatorio.");
+  });
+
+  const driverIds = new Set<string>();
+  const teamUsage = new Map<string, number>();
+  drivers.forEach((driver, index) => {
+    const path = `drivers[${index}]`;
+    if (!isRecord(driver)) {
+      addError(path, "Cada piloto debe ser un objeto.");
+      return;
+    }
+    const driverId = driver.id;
+    if (!isNonEmptyString(driverId)) {
+      addError(`${path}.id`, "id es obligatorio.");
+      return;
+    }
+    if (driverIds.has(driverId)) addError(`${path}.id`, `id duplicado: ${driverId}.`);
+    driverIds.add(driverId);
+    if (!isNonEmptyString(driver.name)) addError(`${path}.name`, "name es obligatorio.");
+    if (!isNonEmptyString(driver.teamId)) {
+      addError(`${path}.teamId`, "teamId es obligatorio.");
+    } else if (!teamIds.has(driver.teamId)) {
+      addError(`${path}.teamId`, `teamId '${driver.teamId}' no existe en teams.`);
+    } else {
+      teamUsage.set(driver.teamId, (teamUsage.get(driver.teamId) || 0) + 1);
+    }
+    if (typeof driver.isActive !== "boolean") {
+      addError(`${path}.isActive`, "isActive debe ser boolean.");
+    }
+  });
+
+  teams.forEach((team, index) => {
+    if (!isRecord(team) || !isNonEmptyString(team.id)) return;
+    if (!teamUsage.get(team.id)) {
+      addWarning(`teams[${index}] (${team.id}) no tiene pilotos asociados en drivers.`);
+    }
+  });
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings,
+    fieldErrors,
+  };
+};
+
+const computeCollectionDiff = <T extends Record<string, any>>(
+  currentDocs: firebase.firestore.QueryDocumentSnapshot[],
+  incomingDocs: T[],
+  getId: (item: T) => string
+): SeasonImportCollectionDiff => {
+  const currentMap = new Map<string, any>();
+  currentDocs.forEach((doc) => {
+    currentMap.set(doc.id, stripUndefinedDeep(doc.data()));
+  });
+
+  const incomingMap = new Map<string, any>();
+  incomingDocs.forEach((item) => {
+    incomingMap.set(getId(item), stripUndefinedDeep(item));
+  });
+
+  let toCreate = 0;
+  let toUpdate = 0;
+  let unchanged = 0;
+
+  incomingMap.forEach((item, id) => {
+    if (!currentMap.has(id)) {
+      toCreate += 1;
+      return;
+    }
+    if (stableSerialize(currentMap.get(id)) !== stableSerialize(item)) {
+      toUpdate += 1;
+      return;
+    }
+    unchanged += 1;
+  });
+
+  let toDelete = 0;
+  currentMap.forEach((_item, id) => {
+    if (!incomingMap.has(id)) toDelete += 1;
+  });
+
+  return {
+    currentCount: currentMap.size,
+    incomingCount: incomingMap.size,
+    toCreate,
+    toUpdate,
+    toDelete,
+    unchanged,
+  };
+};
+
+const replaceCollectionData = async <T extends Record<string, any>>(
+  col: firebase.firestore.CollectionReference,
+  data: T[],
+  getId: (item: T) => string,
+  label: string
+) => {
+  const snap = await col.get();
+  const batch = firestore.batch();
+  snap.forEach((doc) => batch.delete(doc.ref));
+  data.forEach((item) => {
+    batch.set(col.doc(getId(item)), stripUndefinedDeep(item));
+  });
+  await batch.commit();
+  console.log(`replaceCollectionData: ${label} -> ${data.length} documentos`);
+};
+
+const createSeasonImportSnapshot = async (
+  seasonId: string,
+  options?: {
+    createdBy?: string;
+    source?: string;
+    note?: string;
+    dryRun?: Omit<SeasonImportDryRun, "validation">;
+  }
+): Promise<string> => {
+  const [scheduleSnap, teamsSnap, driversSnap] = await Promise.all([
+    firestore.collection(`seasons/${seasonId}/schedule`).get(),
+    firestore.collection(`seasons/${seasonId}/teams`).get(),
+    firestore.collection(`seasons/${seasonId}/drivers`).get(),
+  ]);
+
+  const schedule = scheduleSnap.docs.map((doc) => doc.data() as GrandPrix);
+  const teams = teamsSnap.docs.map((doc) => doc.data() as Team);
+  const drivers = driversSnap.docs.map((doc) => doc.data() as Driver);
+
+  const versionRef = seasonImportVersionsCol(seasonId).doc();
+  await versionRef.set(
+    stripUndefinedDeep({
+      id: versionRef.id,
+      seasonId,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      createdBy: options?.createdBy,
+      source: options?.source || "manual",
+      note: options?.note,
+      dryRun: options?.dryRun,
+      snapshotStats: {
+        scheduleCount: schedule.length,
+        teamsCount: teams.length,
+        driversCount: drivers.length,
+      },
+      snapshot: {
+        schedule,
+        teams,
+        drivers,
+      },
+    })
+  );
+
+  return versionRef.id;
 };
 
 
@@ -354,6 +676,140 @@ export const db = {
     await batch.commit();
     clearActiveSeasonCache();
     console.log('All seasons have been set to inactive. The app is now in off-season mode.');
+  },
+
+  validateSeasonImportPayload: (payload: unknown): SeasonImportValidationResult => {
+    return validateSeasonImportPayload(payload);
+  },
+
+  getSeasonImportDryRun: async (seasonId: string, payload: SeasonImportPayload): Promise<SeasonImportDryRun> => {
+    const validation = validateSeasonImportPayload(payload);
+    if (!validation.isValid) {
+      const error: any = new Error("JSON de temporada invalido.");
+      error.validation = validation;
+      throw error;
+    }
+
+    const [scheduleSnap, teamsSnap, driversSnap] = await Promise.all([
+      firestore.collection(`seasons/${seasonId}/schedule`).get(),
+      firestore.collection(`seasons/${seasonId}/teams`).get(),
+      firestore.collection(`seasons/${seasonId}/drivers`).get(),
+    ]);
+
+    return {
+      seasonId,
+      generatedAt: new Date().toISOString(),
+      validation,
+      collections: {
+        schedule: computeCollectionDiff(scheduleSnap.docs, payload.schedule, (gp) => String(gp.id)),
+        teams: computeCollectionDiff(teamsSnap.docs, payload.teams, (team) => team.id),
+        drivers: computeCollectionDiff(driversSnap.docs, payload.drivers, (driver) => driver.id),
+      },
+    };
+  },
+
+  listSeasonImportVersions: async (seasonId: string, limitCount = 10): Promise<SeasonImportVersion[]> => {
+    const snapshot = await seasonImportVersionsCol(seasonId)
+      .orderBy("createdAt", "desc")
+      .limit(limitCount)
+      .get();
+
+    return snapshot.docs.map((doc) => {
+      const data = doc.data() as any;
+      return {
+        id: doc.id,
+        seasonId: data.seasonId || seasonId,
+        createdAt: data.createdAt,
+        createdBy: data.createdBy,
+        source: data.source,
+        note: data.note,
+        snapshotStats: {
+          scheduleCount: data?.snapshotStats?.scheduleCount || 0,
+          teamsCount: data?.snapshotStats?.teamsCount || 0,
+          driversCount: data?.snapshotStats?.driversCount || 0,
+        },
+      } as SeasonImportVersion;
+    });
+  },
+
+  getSeasonImportPayload: async (seasonId: string): Promise<SeasonImportPayload> => {
+    const [scheduleSnap, teamsSnap, driversSnap] = await Promise.all([
+      firestore.collection(`seasons/${seasonId}/schedule`).orderBy("id").get(),
+      firestore.collection(`seasons/${seasonId}/teams`).get(),
+      firestore.collection(`seasons/${seasonId}/drivers`).get(),
+    ]);
+
+    const schedule = scheduleSnap.docs.map((doc) =>
+      stripUndefinedDeep(doc.data() as GrandPrix)
+    ) as GrandPrix[];
+    const teams = teamsSnap.docs
+      .map((doc) => stripUndefinedDeep(doc.data() as Team) as Team)
+      .sort((a, b) => a.id.localeCompare(b.id));
+    const drivers = driversSnap.docs
+      .map((doc) => stripUndefinedDeep(doc.data() as Driver) as Driver)
+      .sort((a, b) => a.id.localeCompare(b.id));
+
+    return {
+      schedule,
+      teams,
+      drivers,
+    };
+  },
+
+  rollbackSeasonImportVersion: async (
+    seasonId: string,
+    versionId: string,
+    options?: { createdBy?: string }
+  ): Promise<void> => {
+    const versionRef = seasonImportVersionsCol(seasonId).doc(versionId);
+    const versionSnap = await versionRef.get();
+    if (!versionSnap.exists) {
+      throw new Error(`No existe la version ${versionId} para la temporada ${seasonId}.`);
+    }
+
+    const raw = versionSnap.data() as any;
+    const payload = raw?.snapshot as SeasonImportPayload | undefined;
+    const validation = validateSeasonImportPayload(payload);
+    if (!validation.isValid) {
+      const error: any = new Error("La version seleccionada contiene datos invalidos y no puede restaurarse.");
+      error.validation = validation;
+      throw error;
+    }
+
+    const dryRun = await db.getSeasonImportDryRun(seasonId, payload as SeasonImportPayload);
+    await createSeasonImportSnapshot(seasonId, {
+      createdBy: options?.createdBy,
+      source: "rollback-backup",
+      note: `Backup previo a rollback hacia ${versionId}`,
+      dryRun: {
+        seasonId: dryRun.seasonId,
+        generatedAt: dryRun.generatedAt,
+        collections: dryRun.collections,
+      },
+    });
+
+    await Promise.all([
+      replaceCollectionData(
+        firestore.collection(`seasons/${seasonId}/schedule`),
+        payload!.schedule,
+        (gp) => String(gp.id),
+        `seasons/${seasonId}/schedule`
+      ),
+      replaceCollectionData(
+        firestore.collection(`seasons/${seasonId}/teams`),
+        payload!.teams,
+        (team) => team.id,
+        `seasons/${seasonId}/teams`
+      ),
+      replaceCollectionData(
+        firestore.collection(`seasons/${seasonId}/drivers`),
+        payload!.drivers,
+        (driver) => driver.id,
+        `seasons/${seasonId}/drivers`
+      ),
+    ]);
+
+    clearActiveSeasonCache();
   },
 
   // --- SEASONAL DATA ---
@@ -1169,58 +1625,64 @@ export const db = {
           isActive: true,
       }));
 
-      // Persist: replace existing docs
-      const scheduleCol = firestore.collection(`seasons/${seasonId}/schedule`);
-      const teamsColRef = firestore.collection(`seasons/${seasonId}/teams`);
-      const driversColRef = firestore.collection(`seasons/${seasonId}/drivers`);
-
-      const clearAndFill = async (col: firebase.firestore.CollectionReference, data: any[], getId: (item: any) => string) => {
-          const snap = await col.get();
-          const batch = firestore.batch();
-          snap.forEach(doc => batch.delete(doc.ref));
-          data.forEach(item => {
-              batch.set(col.doc(getId(item)), item);
-          });
-          await batch.commit();
-      };
-
-      await clearAndFill(scheduleCol, schedule, (g) => String(g.id));
-      await clearAndFill(teamsColRef, teams, (t) => t.id);
-      await clearAndFill(driversColRef, drivers, (d) => d.id);
-
-      clearActiveSeasonCache();
+      await db.importSeasonDataFromJson(
+        seasonId,
+        { schedule, teams, drivers },
+        { source: "ergast", note: `Importado automaticamente desde Ergast ${seasonId}` }
+      );
   },
 
   /**
    * Importa calendario, equipos y pilotos desde un JSON ya estructurado.
    * Estructura esperada: { schedule: GrandPrix[], teams: Team[], drivers: Driver[] }
    */
-  importSeasonDataFromJson: async (seasonId: string, payload: { schedule: GrandPrix[], teams: Team[], drivers: Driver[] }): Promise<void> => {
-      if (!payload?.schedule || !payload?.teams || !payload?.drivers) {
-          throw new Error('JSON inválido. Debe incluir schedule, teams y drivers.');
+  importSeasonDataFromJson: async (
+    seasonId: string,
+    payload: SeasonImportPayload,
+    options?: { createdBy?: string; source?: string; note?: string }
+  ): Promise<{ backupVersionId: string; dryRun: SeasonImportDryRun }> => {
+      const validation = validateSeasonImportPayload(payload);
+      if (!validation.isValid) {
+          const error: any = new Error("JSON inválido. Revisa los campos marcados.");
+          error.validation = validation;
+          throw error;
       }
 
-      const scheduleCol = firestore.collection(`seasons/${seasonId}/schedule`);
-      const teamsColRef = firestore.collection(`seasons/${seasonId}/teams`);
-      const driversColRef = firestore.collection(`seasons/${seasonId}/drivers`);
+      const dryRun = await db.getSeasonImportDryRun(seasonId, payload);
+      const backupVersionId = await createSeasonImportSnapshot(seasonId, {
+          createdBy: options?.createdBy,
+          source: options?.source || "json-file",
+          note: options?.note,
+          dryRun: {
+              seasonId: dryRun.seasonId,
+              generatedAt: dryRun.generatedAt,
+              collections: dryRun.collections,
+          },
+      });
 
-      const clearAndFill = async (col: firebase.firestore.CollectionReference, data: any[], getId: (item: any) => string, label: string) => {
-          const snap = await col.get();
-          const batch = firestore.batch();
-          snap.forEach(doc => batch.delete(doc.ref));
-          data.forEach(item => {
-              batch.set(col.doc(getId(item)), item);
-          });
-          await batch.commit();
-          console.log(`importSeasonDataFromJson: reemplazados ${data.length} documentos en ${label}`);
-      };
+      await Promise.all([
+          replaceCollectionData(
+            firestore.collection(`seasons/${seasonId}/schedule`),
+            payload.schedule,
+            (gp) => String(gp.id),
+            `seasons/${seasonId}/schedule`
+          ),
+          replaceCollectionData(
+            firestore.collection(`seasons/${seasonId}/teams`),
+            payload.teams,
+            (team) => team.id,
+            `seasons/${seasonId}/teams`
+          ),
+          replaceCollectionData(
+            firestore.collection(`seasons/${seasonId}/drivers`),
+            payload.drivers,
+            (driver) => driver.id,
+            `seasons/${seasonId}/drivers`
+          ),
+      ]);
 
-      await clearAndFill(scheduleCol, payload.schedule, (g) => String(g.id), `seasons/${seasonId}/schedule`);
-      await clearAndFill(teamsColRef, payload.teams, (t) => t.id, `seasons/${seasonId}/teams`);
-      await clearAndFill(driversColRef, payload.drivers, (d) => d.id, `seasons/${seasonId}/drivers`);
-
-      // Limpia cache de temporada activa para que las siguientes lecturas traigan los nuevos datos.
       clearActiveSeasonCache();
+      return { backupVersionId, dryRun };
   },
 
   /**
@@ -1230,6 +1692,9 @@ export const db = {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`No se pudo obtener el JSON (${res.status})`);
       const data = await res.json();
-      await db.importSeasonDataFromJson(seasonId, data as any);
+      await db.importSeasonDataFromJson(seasonId, data as SeasonImportPayload, {
+        source: "json-url",
+        note: `Importado desde URL: ${url}`,
+      });
   },
 };
