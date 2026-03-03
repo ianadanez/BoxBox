@@ -1,12 +1,13 @@
 
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { NavLink, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Avatar from './common/Avatar';
 import { User, Notification } from '../types';
 import { db } from '../services/db';
 import { listenToActiveSeason } from '../services/seasonService';
+import { detectViewerPlatform } from '../services/downloadTracking';
 
 const SearchIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-6 w-6"} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -164,6 +165,7 @@ const Header: React.FC = () => {
     const [usersForNotifs, setUsersForNotifs] = useState<User[]>([]);
     const [nextGpId, setNextGpId] = useState<number | null>(null);
     const [isOffSeason, setIsOffSeason] = useState<boolean | null>(null);
+    const viewerPlatform = useMemo(() => detectViewerPlatform(), []);
 
     const notifRef = useRef<HTMLDivElement>(null);
     const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -361,6 +363,9 @@ const Header: React.FC = () => {
                          )}
                          <NavLink to="/tournaments" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `block px-3 py-2 rounded-md text-base font-medium ${isActive ? 'bg-[var(--accent-red)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--background-light)] hover:text-white'}`}>Torneos</NavLink>
                            <NavLink to="/how-to-play" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `block px-3 py-2 rounded-md text-base font-medium ${isActive ? 'bg-[var(--accent-red)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--background-light)] hover:text-white'}`}>Como Jugar</NavLink>
+                           {viewerPlatform === 'android' && (
+                               <NavLink to="/app-download" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `block px-3 py-2 rounded-md text-base font-medium ${isActive ? 'bg-[var(--accent-red)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--background-light)] hover:text-white'}`}>Instalar App Android</NavLink>
+                           )}
                     </div>
                      {!isAuthenticated && (
                          <div className="px-2 pt-2 pb-3 space-y-2 border-t border-[var(--border-color)]">

@@ -114,6 +114,72 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // AD CAMPAIGNS
+    // Public read for rendering banners. Admin CRUD.
+    match /ad_campaigns/{campaignId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // AD EVENTS (tracking impressions/clicks)
+    // Clients can create events, only admins can read raw telemetry.
+    match /ad_events/{eventId} {
+      allow create: if request.resource.data.keys().hasOnly([
+                      'campaignId',
+                      'placement',
+                      'eventType',
+                      'pagePath',
+                      'sessionId',
+                      'targetUrl',
+                      'userId',
+                      'createdAt'
+                    ])
+                    && request.resource.data.campaignId is string
+                    && request.resource.data.placement is string
+                    && request.resource.data.eventType in ['impression', 'click']
+                    && request.resource.data.pagePath is string
+                    && request.resource.data.sessionId is string
+                    && (request.resource.data.targetUrl == null || request.resource.data.targetUrl is string)
+                    && (
+                        (isSignedIn() && request.resource.data.userId == request.auth.uid) ||
+                        (!isSignedIn() && request.resource.data.userId == null)
+                       )
+                    && request.resource.data.createdAt == request.time
+                    && exists(/databases/$(database)/documents/ad_campaigns/$(request.resource.data.campaignId));
+      allow read, update, delete: if isAdmin();
+    }
+
+    // DOWNLOAD EVENTS (tracking CTA clicks from web banner)
+    match /download_events/{eventId} {
+      allow create: if request.resource.data.keys().hasOnly([
+                      'eventName',
+                      'targetPlatform',
+                      'viewerPlatform',
+                      'source',
+                      'pagePath',
+                      'sessionId',
+                      'userId',
+                      'createdAt'
+                    ])
+                    && request.resource.data.eventName in [
+                        'banner_cta_click',
+                        'banner_close',
+                        'tutorial_android_download_click',
+                        'tutorial_copy_link_click'
+                       ]
+                    && request.resource.data.targetPlatform in ['android', 'ios']
+                    && request.resource.data.viewerPlatform in ['android', 'ios', 'desktop']
+                    && request.resource.data.source is string
+                    && request.resource.data.pagePath is string
+                    && request.resource.data.sessionId is string
+                    && (
+                        (isSignedIn() && request.resource.data.userId == request.auth.uid) ||
+                        (!isSignedIn() && request.resource.data.userId == null)
+                       )
+                    && request.resource.data.createdAt == request.time;
+      allow read, update, delete: if isAdmin();
+    }
+
     // SETTINGS (admin only)
     match /settings/{docId} {
       allow read, write: if isAdmin();

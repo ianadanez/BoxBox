@@ -65,6 +65,7 @@ export interface User {
   favoriteTeamId?: string;
   favoriteTeamSeason?: string; // temporada en la que se confirmó el favorito
   favoriteTeamHistory?: FavoriteTeamAssignment[];
+  announcementsSeen?: Record<string, string>; // announcementId -> ISO datetime
   countryCode?: string;
   createdAt: string;
 }
@@ -115,6 +116,100 @@ export interface ScheduledNotification {
   pushReceiptErrorCount?: number;
   pushReceiptPendingCount?: number;
   pushOpenedCount?: number;
+}
+
+export type AdCampaignStatus = 'draft' | 'active' | 'paused' | 'archived';
+export type AdEventType = 'impression' | 'click';
+export type AdImageOrientation = 'horizontal' | 'vertical' | 'square';
+export type AdImageOrientationMode = 'auto' | AdImageOrientation;
+export type AdPlacement =
+  | 'home_leaderboard_inline'
+  | 'search_bottom'
+  | 'tournaments_bottom'
+  | 'profile_bottom';
+
+export interface AdCampaign {
+  id: string;
+  name: string;
+  sponsorName?: string;
+  title: string;
+  description?: string;
+  imageUrl?: string;
+  imageFit?: 'cover' | 'contain';
+  focalPointX?: number; // 0..100
+  focalPointY?: number; // 0..100
+  imageOrientationMode?: AdImageOrientationMode;
+  imageScaleDesktop?: number; // 50..180
+  imageScaleMobile?: number; // 50..180
+  targetUrl: string;
+  ctaText?: string;
+  placements: AdPlacement[];
+  status: AdCampaignStatus;
+  priority: number;
+  startAt?: any;
+  endAt?: any;
+  createdAt?: any;
+  updatedAt?: any;
+  createdBy?: string;
+  updatedBy?: string;
+}
+
+export interface AdCampaignPayload {
+  name: string;
+  sponsorName?: string;
+  title: string;
+  description?: string;
+  imageUrl?: string;
+  imageFit?: 'cover' | 'contain';
+  focalPointX?: number;
+  focalPointY?: number;
+  imageOrientationMode?: AdImageOrientationMode;
+  imageScaleDesktop?: number;
+  imageScaleMobile?: number;
+  targetUrl: string;
+  ctaText?: string;
+  placements: AdPlacement[];
+  status: AdCampaignStatus;
+  priority?: number;
+  startAt?: Date | null;
+  endAt?: Date | null;
+}
+
+export interface AdEvent {
+  id?: string;
+  campaignId: string;
+  placement: AdPlacement;
+  eventType: AdEventType;
+  pagePath: string;
+  sessionId: string;
+  targetUrl?: string;
+  userId?: string | null;
+  createdAt?: any;
+}
+
+export interface AdPlacementMetrics {
+  impressions: number;
+  clicks: number;
+  ctr: number;
+}
+
+export interface AdCampaignMetrics {
+  campaignId: string;
+  campaignName: string;
+  sponsorName?: string;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  byPlacement: Partial<Record<AdPlacement, AdPlacementMetrics>>;
+}
+
+export interface AdAnalyticsReport {
+  from: string;
+  to: string;
+  totalImpressions: number;
+  totalClicks: number;
+  ctr: number;
+  campaigns: AdCampaignMetrics[];
 }
 
 export interface Avatar {

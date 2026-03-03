@@ -5,7 +5,7 @@ import { db } from '../services/db';
 import { Tournament, User, SeasonTotal } from '../types';
 import Avatar from '../components/common/Avatar';
 import { useNavigate, Link } from 'react-router-dom';
-import GoogleAd from '../components/common/GoogleAd';
+import AdSlot from '../components/common/AdSlot';
 
 const TournamentsPage: React.FC = () => {
     const { user } = useAuth();
@@ -404,8 +404,7 @@ const TournamentsPage: React.FC = () => {
                     </div>
                     {view === 'list' && (
                         <div className="mt-12">
-                            <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)] text-center mb-4">Publicidad</h2>
-                            <GoogleAd slot="REEMPLAZA_CON_ID_TORNEOS" />
+                            <AdSlot placement="tournaments_bottom" />
                         </div>
                     )}
                 </>

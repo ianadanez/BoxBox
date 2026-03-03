@@ -40,7 +40,7 @@ const Footer: React.FC = () => {
                     <ul className="list-disc pl-5">
                         <li><strong>Datos que recopilamos:</strong> Tu correo electrónico (solo para autenticación), nombre de usuario, y tus predicciones.</li>
                         <li><strong>Uso de datos:</strong> Solo usamos tu información para gestionar el juego, calcular puntuaciones y mostrar la tabla de posiciones.</li>
-                        <li><strong>Publicidad:</strong> Utilizamos Google AdSense para mostrar anuncios. Google puede utilizar cookies para servir anuncios basados en tus visitas anteriores a este u otros sitios web.</li>
+                        <li><strong>Publicidad:</strong> Podemos mostrar banners de terceros y registrar métricas de impresiones/clicks para reportes comerciales.</li>
                         <li><strong>Terceros:</strong> No vendemos ni compartimos tus datos personales con terceros no relacionados con el funcionamiento técnico de la app.</li>
                     </ul>
                 </Modal>

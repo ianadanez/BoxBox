@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { db } from '../services/db';
 import { User } from '../types';
 import Avatar from '../components/common/Avatar';
-import GoogleAd from '../components/common/GoogleAd';
+import AdSlot from '../components/common/AdSlot';
 import { useAuth } from '../contexts/AuthContext';
 
 const SearchPage: React.FC = () => {
@@ -75,8 +75,7 @@ const SearchPage: React.FC = () => {
 
             {/* AdSense Block */}
             <div className="mt-12">
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)] text-center mb-4">Publicidad</h2>
-                <GoogleAd slot="9191009943" />
+                <AdSlot placement="search_bottom" />
             </div>
         </div>
     );

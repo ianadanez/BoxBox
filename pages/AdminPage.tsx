@@ -10,8 +10,9 @@ import { ResultsManagement } from '../components/ResultsManagement';
 import { db } from '../services/db';
 import { toast } from 'react-toastify';
 import NotificationsManagement from '../components/NotificationsManagement';
+import AdsManagement from '../components/AdsManagement';
 
-type AdminTab = 'results' | 'users' | 'calendar' | 'drivers' | 'seasons' | 'notifications';
+type AdminTab = 'results' | 'users' | 'calendar' | 'drivers' | 'seasons' | 'notifications' | 'ads';
 
 const AdminPage: React.FC = () => {
     const { user } = useAuth();
@@ -69,6 +70,7 @@ const AdminPage: React.FC = () => {
                 <button onClick={() => setActiveTab('drivers')} className={`px-4 py-2 text-lg font-medium transition-colors whitespace-nowrap ${activeTab === 'drivers' ? 'f1-red-text border-b-2 border-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>Pilotos y Equipos</button>
                 <button onClick={() => setActiveTab('seasons')} className={`px-4 py-2 text-lg font-medium transition-colors whitespace-nowrap ${activeTab === 'seasons' ? 'f1-red-text border-b-2 border-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>Temporadas</button>
                 <button onClick={() => setActiveTab('notifications')} className={`px-4 py-2 text-lg font-medium transition-colors whitespace-nowrap ${activeTab === 'notifications' ? 'f1-red-text border-b-2 border-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>Notificaciones</button>
+                <button onClick={() => setActiveTab('ads')} className={`px-4 py-2 text-lg font-medium transition-colors whitespace-nowrap ${activeTab === 'ads' ? 'f1-red-text border-b-2 border-[var(--accent-red)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>Banners</button>
             </div>
             <div>
                 {activeTab === 'results' && <ResultsManagement />}
@@ -77,6 +79,7 @@ const AdminPage: React.FC = () => {
                 {activeTab === 'drivers' && <DriversManagement />}
                 {activeTab === 'seasons' && <SeasonManagement />}
                 {activeTab === 'notifications' && <NotificationsManagement />}
+                {activeTab === 'ads' && <AdsManagement />}
             </div>
         </div>
     );

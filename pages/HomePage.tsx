@@ -5,7 +5,8 @@ import { GrandPrix, OfficialResult, Driver, Team, SeasonTotal, ConstructorStandi
 import { db } from '../services/db';
 import Countdown from '../components/common/Countdown';
 import Avatar from '../components/common/Avatar';
-import GoogleAd from '../components/common/GoogleAd';
+import AdSlot from '../components/common/AdSlot';
+import AppDownloadMiniCard from '../components/common/AppDownloadMiniCard';
 import { useAuth } from '../contexts/AuthContext';
 
 const getTeamColor = (driverId: string, drivers: Driver[], teams: Team[]) => {
@@ -247,7 +248,7 @@ const HomePage: React.FC = () => {
                         </Link>
                     </div>
                      <div className="mt-8">
-                        <GoogleAd slot="3093952327" />
+                        <AdSlot placement="home_leaderboard_inline" />
                     </div>
                 </div>
                 <div className="xl:col-span-3 space-y-8">
@@ -290,6 +291,7 @@ const HomePage: React.FC = () => {
                             </div>
                         </div>
                     )}
+                    <AppDownloadMiniCard />
                 </div>
             </div>
         </div>

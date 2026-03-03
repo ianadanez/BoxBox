@@ -7,7 +7,7 @@ import { Avatar as AvatarType, GpScore, User, SeasonTotal, Team, Season, Driver 
 import Avatar from '../components/common/Avatar';
 import AvatarEditor from '../components/common/AvatarEditor';
 import { db } from '../services/db';
-import GoogleAd from '../components/common/GoogleAd';
+import AdSlot from '../components/common/AdSlot';
 import { getActiveSeason, listenToActiveSeason } from '../services/seasonService';
 import { engine } from '../services/engine';
 import { appendFavoriteTeamAssignment, normalizeFavoriteTeamHistory } from '../services/favoriteTeamHistory';
@@ -649,8 +649,7 @@ const ProfilePage: React.FC = () => {
             </div>
              {/* AdSense Block */}
             <div className="mt-8">
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)] text-center mb-4">Publicidad</h2>
-                <GoogleAd slot="4912304848" />
+                <AdSlot placement="profile_bottom" />
             </div>
         </div>
     );

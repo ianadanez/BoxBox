@@ -29,9 +29,15 @@ import {
   SeasonImportDryRun,
   SeasonImportCollectionDiff,
   SeasonImportVersion,
+  AdCampaign,
+  AdCampaignPayload,
+  AdEvent,
+  AdAnalyticsReport,
+  AdCampaignMetrics,
 } from '../types';
 import { TEAMS, DRIVERS, GP_SCHEDULE } from '../constants';
 import { engine } from './engine';
+import { formatCtr, toMillis } from './ads';
 // Import the season service functions
 import { getActiveSeason, clearActiveSeasonCache, getLastInactiveSeasonId } from './seasonService';
 
@@ -52,11 +58,17 @@ const usernamesCol = firestore.collection('usernames');
 const notificationsCol = firestore.collection('notifications');
 const settingsCol = firestore.collection('settings');
 const scheduledNotificationsCol = firestore.collection('scheduled_notifications');
+const adCampaignsCol = firestore.collection('ad_campaigns');
+const adEventsCol = firestore.collection('ad_events');
 const seasonsCol = firestore.collection('seasons'); // New collection ref
 const publicLeaderboardCol = (seasonId: string) => firestore.collection(`seasons/${seasonId}/public_leaderboard`);
 const publicConstructorsLeaderboardCol = (seasonId: string) => firestore.collection(`seasons/${seasonId}/public_constructors_leaderboard`);
 const publicGpStandingsCol = (seasonId: string, gpId: number) => firestore.collection(`seasons/${seasonId}/public_gp_standings/${gpId}/standings`);
 const seasonImportVersionsCol = (seasonId: string) => firestore.collection(`seasons/${seasonId}/import_versions`);
+
+const ACTIVE_CAMPAIGNS_CACHE_MS = 60 * 1000;
+let activeCampaignsCache: { fetchedAt: number; data: AdCampaign[] } | null = null;
+let activeCampaignsPromise: Promise<AdCampaign[]> | null = null;
 
 
 // --- SEASON-AWARE HELPER ---
@@ -129,6 +141,56 @@ const parseIsoDate = (value: unknown): number | null => {
   if (!isNonEmptyString(value)) return null;
   const ms = Date.parse(value);
   return Number.isNaN(ms) ? null : ms;
+};
+
+const toTimestampOrNull = (value?: Date | null) => {
+  if (!value) return null;
+  return firebase.firestore.Timestamp.fromDate(value);
+};
+
+const sanitizeAdCampaignPayload = (payload: AdCampaignPayload) => {
+  const placements = Array.isArray(payload.placements)
+    ? Array.from(new Set(payload.placements.filter((item) => typeof item === 'string')))
+    : [];
+
+  const status = payload.status || 'draft';
+  const priority = Number.isFinite(payload.priority) ? Math.max(1, Math.round(Number(payload.priority))) : 1;
+  const imageFit = payload.imageFit === 'contain' ? 'contain' : 'cover';
+  const focalPointX = Number.isFinite(payload.focalPointX) ? Math.max(0, Math.min(100, Number(payload.focalPointX))) : 50;
+  const focalPointY = Number.isFinite(payload.focalPointY) ? Math.max(0, Math.min(100, Number(payload.focalPointY))) : 50;
+  const imageOrientationMode =
+    payload.imageOrientationMode === 'horizontal' ||
+    payload.imageOrientationMode === 'vertical' ||
+    payload.imageOrientationMode === 'square'
+      ? payload.imageOrientationMode
+      : 'auto';
+  const imageScaleDesktop = Number.isFinite(payload.imageScaleDesktop)
+    ? Math.max(50, Math.min(180, Number(payload.imageScaleDesktop)))
+    : 100;
+  const imageScaleMobile = Number.isFinite(payload.imageScaleMobile)
+    ? Math.max(50, Math.min(180, Number(payload.imageScaleMobile)))
+    : 100;
+
+  return stripUndefinedDeep({
+    name: payload.name.trim(),
+    sponsorName: payload.sponsorName?.trim() || null,
+    title: payload.title.trim(),
+    description: payload.description?.trim() || null,
+    imageUrl: payload.imageUrl?.trim() || null,
+    imageFit,
+    focalPointX,
+    focalPointY,
+    imageOrientationMode,
+    imageScaleDesktop,
+    imageScaleMobile,
+    targetUrl: payload.targetUrl.trim(),
+    ctaText: payload.ctaText?.trim() || null,
+    placements,
+    status,
+    priority,
+    startAt: toTimestampOrNull(payload.startAt),
+    endAt: toTimestampOrNull(payload.endAt),
+  });
 };
 
 const sortObjectKeysDeep = (value: any): any => {
@@ -605,6 +667,209 @@ export const db = {
           status: 'cancelled',
           updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
+  },
+
+  // Ads / banners
+  listAdCampaignsForAdmin: async (): Promise<AdCampaign[]> => {
+      const snapshot = await adCampaignsCol.orderBy('updatedAt', 'desc').get();
+      return snapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as Omit<AdCampaign, 'id'>) }));
+  },
+  getActiveAdCampaigns: async (): Promise<AdCampaign[]> => {
+      const now = Date.now();
+      if (activeCampaignsCache && now - activeCampaignsCache.fetchedAt < ACTIVE_CAMPAIGNS_CACHE_MS) {
+          return activeCampaignsCache.data;
+      }
+      if (activeCampaignsPromise) return activeCampaignsPromise;
+
+      activeCampaignsPromise = (async () => {
+          const snapshot = await adCampaignsCol.where('status', '==', 'active').get();
+          const campaigns = snapshot.docs
+              .map((doc) => ({ id: doc.id, ...(doc.data() as Omit<AdCampaign, 'id'>) }))
+              .filter((campaign) => {
+                  const startMs = toMillis(campaign.startAt);
+                  const endMs = toMillis(campaign.endAt);
+                  if (startMs !== null && now < startMs) return false;
+                  if (endMs !== null && now > endMs) return false;
+                  return Array.isArray(campaign.placements) && campaign.placements.length > 0;
+              })
+              .sort((a, b) => (Number(b.priority) || 0) - (Number(a.priority) || 0));
+
+          activeCampaignsCache = { fetchedAt: Date.now(), data: campaigns };
+          activeCampaignsPromise = null;
+          return campaigns;
+      })().catch((error) => {
+          activeCampaignsPromise = null;
+          throw error;
+      });
+
+      return activeCampaignsPromise;
+  },
+  createAdCampaign: async (payload: AdCampaignPayload, adminId: string): Promise<string> => {
+      if (!payload.name.trim()) throw new Error('El nombre de campaña es obligatorio.');
+      if (!payload.title.trim()) throw new Error('El título del banner es obligatorio.');
+      if (!payload.targetUrl.trim()) throw new Error('La URL de destino es obligatoria.');
+
+      const sanitized = sanitizeAdCampaignPayload(payload);
+      if (sanitized.status === 'active' && (!sanitized.placements || sanitized.placements.length === 0)) {
+          throw new Error('Una campaña activa necesita al menos una ubicación.');
+      }
+
+      const docRef = adCampaignsCol.doc();
+      await docRef.set({
+          id: docRef.id,
+          ...sanitized,
+          createdBy: adminId,
+          updatedBy: adminId,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      activeCampaignsCache = null;
+      return docRef.id;
+  },
+  updateAdCampaign: async (campaignId: string, payload: AdCampaignPayload, adminId: string): Promise<void> => {
+      if (!campaignId) throw new Error('Falta campaignId.');
+      if (!payload.name.trim()) throw new Error('El nombre de campaña es obligatorio.');
+      if (!payload.title.trim()) throw new Error('El título del banner es obligatorio.');
+      if (!payload.targetUrl.trim()) throw new Error('La URL de destino es obligatoria.');
+
+      const sanitized = sanitizeAdCampaignPayload(payload);
+      if (sanitized.status === 'active' && (!sanitized.placements || sanitized.placements.length === 0)) {
+          throw new Error('Una campaña activa necesita al menos una ubicación.');
+      }
+
+      await adCampaignsCol.doc(campaignId).set(
+          {
+              ...sanitized,
+              updatedBy: adminId,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+      );
+      activeCampaignsCache = null;
+  },
+  archiveAdCampaign: async (campaignId: string, adminId: string): Promise<void> => {
+      await adCampaignsCol.doc(campaignId).set(
+          {
+              status: 'archived',
+              updatedBy: adminId,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+      );
+      activeCampaignsCache = null;
+  },
+  trackAdEvent: async (payload: Omit<AdEvent, 'id' | 'createdAt'>): Promise<void> => {
+      if (!payload.campaignId || !payload.placement || !payload.eventType) return;
+      await adEventsCol.add({
+          campaignId: payload.campaignId,
+          placement: payload.placement,
+          eventType: payload.eventType,
+          pagePath: payload.pagePath || '/',
+          sessionId: payload.sessionId || 'unknown',
+          targetUrl: payload.targetUrl || null,
+          userId: payload.userId || null,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+  },
+  getAdAnalyticsReport: async (rangeDays = 30): Promise<AdAnalyticsReport> => {
+      const safeDays = Math.max(1, Math.min(365, Math.round(rangeDays)));
+      const fromDate = new Date(Date.now() - safeDays * 24 * 60 * 60 * 1000);
+      const fromTimestamp = firebase.firestore.Timestamp.fromDate(fromDate);
+      const [campaignsSnapshot, eventsSnapshot] = await Promise.all([
+          adCampaignsCol.get(),
+          adEventsCol.where('createdAt', '>=', fromTimestamp).get(),
+      ]);
+
+      const campaigns = campaignsSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...(doc.data() as Omit<AdCampaign, 'id'>),
+      }));
+      const byCampaign = new Map<string, {
+          campaignId: string;
+          campaignName: string;
+          sponsorName?: string;
+          impressions: number;
+          clicks: number;
+          byPlacement: Record<string, { impressions: number; clicks: number }>;
+      }>();
+
+      campaigns.forEach((campaign) => {
+          byCampaign.set(campaign.id, {
+              campaignId: campaign.id,
+              campaignName: campaign.name,
+              sponsorName: campaign.sponsorName,
+              impressions: 0,
+              clicks: 0,
+              byPlacement: {},
+          });
+      });
+
+      let totalImpressions = 0;
+      let totalClicks = 0;
+
+      eventsSnapshot.forEach((doc) => {
+          const event = doc.data() as AdEvent;
+          if (!event?.campaignId || !event?.eventType || !event?.placement) return;
+
+          if (!byCampaign.has(event.campaignId)) {
+              byCampaign.set(event.campaignId, {
+                  campaignId: event.campaignId,
+                  campaignName: 'Campaña eliminada',
+                  sponsorName: '',
+                  impressions: 0,
+                  clicks: 0,
+                  byPlacement: {},
+              });
+          }
+
+          const campaignStats = byCampaign.get(event.campaignId)!;
+          if (!campaignStats.byPlacement[event.placement]) {
+              campaignStats.byPlacement[event.placement] = { impressions: 0, clicks: 0 };
+          }
+          const placementStats = campaignStats.byPlacement[event.placement];
+
+          if (event.eventType === 'impression') {
+              campaignStats.impressions += 1;
+              placementStats.impressions += 1;
+              totalImpressions += 1;
+          } else if (event.eventType === 'click') {
+              campaignStats.clicks += 1;
+              placementStats.clicks += 1;
+              totalClicks += 1;
+          }
+      });
+
+      const campaignsReport: AdCampaignMetrics[] = Array.from(byCampaign.values())
+          .map((entry) => ({
+              campaignId: entry.campaignId,
+              campaignName: entry.campaignName,
+              sponsorName: entry.sponsorName,
+              impressions: entry.impressions,
+              clicks: entry.clicks,
+              ctr: formatCtr(entry.clicks, entry.impressions),
+              byPlacement: Object.entries(entry.byPlacement).reduce<AdCampaignMetrics['byPlacement']>((acc, [placement, value]) => {
+                  acc[placement as keyof NonNullable<AdCampaignMetrics['byPlacement']>] = {
+                      impressions: value.impressions,
+                      clicks: value.clicks,
+                      ctr: formatCtr(value.clicks, value.impressions),
+                  };
+                  return acc;
+              }, {}),
+          }))
+          .sort((a, b) => {
+              if (b.impressions !== a.impressions) return b.impressions - a.impressions;
+              if (b.clicks !== a.clicks) return b.clicks - a.clicks;
+              return a.campaignName.localeCompare(b.campaignName);
+          });
+
+      return {
+          from: fromDate.toISOString(),
+          to: new Date().toISOString(),
+          totalImpressions,
+          totalClicks,
+          ctr: formatCtr(totalClicks, totalImpressions),
+          campaigns: campaignsReport,
+      };
   },
 
   // --- SEASON MANAGEMENT ---

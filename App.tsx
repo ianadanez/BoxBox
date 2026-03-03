@@ -9,6 +9,8 @@ import CookieConsent from './components/common/CookieConsent';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import { listenToActiveSeason } from './services/seasonService'; // Import the service
 import FavoriteTeamBanner from './components/common/FavoriteTeamBanner';
+import UserAnnouncementModal from './components/common/UserAnnouncementModal';
+import AppDownloadBanner from './components/common/AppDownloadBanner';
 
 // Lazy Load Pages
 const HomePage = React.lazy(() => import('./pages/HomePage'));
@@ -25,6 +27,7 @@ const EmailVerificationPage = React.lazy(() => import('./pages/EmailVerification
 const OffSeasonPage = React.lazy(() => import('./pages/OffSeasonPage'));
 const SeasonWrappedPage = React.lazy(() => import('./pages/SeasonWrappedPage'));
 const LeaderboardPage = React.lazy(() => import('./pages/LeaderboardPage'));
+const AppDownloadPage = React.lazy(() => import('./pages/AppDownloadPage'));
 
 const PrivateRoute: React.FC<{ children: React.ReactNode, adminOnly?: boolean }> = ({ children, adminOnly = false }) => {
     const { user, loading } = useAuth();
@@ -62,6 +65,7 @@ const AppRoutes: React.FC = () => {
             <Route path="/profile/:userId" element={<ProfilePage />} />
             <Route path="/how-to-play" element={<HowToPlayPage />} />
             <Route path="/leaderboard" element={<LeaderboardPage />} />
+            <Route path="/app-download" element={<AppDownloadPage />} />
             <Route path="/predict/:gpId" element={<PrivateRoute><PredictionsPage /></PrivateRoute>} />
             <Route path="/tournaments" element={<PrivateRoute><TournamentsPage /></PrivateRoute>} />
             <Route path="/results/:userId/:gpId" element={<PrivateRoute><ResultsReviewPage /></PrivateRoute>} />
@@ -78,6 +82,7 @@ const App: React.FC = () => {
         <HashRouter>
             <div className="min-h-screen bg-[var(--background-dark)] text-[var(--text-primary)] flex flex-col">
                 <Header />
+                <AppDownloadBanner />
                 <FavoriteTeamBanner />
                 <main className="flex-grow flex flex-col">
                     <Suspense fallback={<LoadingSpinner />}>
@@ -86,6 +91,7 @@ const App: React.FC = () => {
                 </main>
                 <Footer />
                 <CookieConsent />
+                <UserAnnouncementModal />
             </div>
         </HashRouter>
     </AuthProvider>
