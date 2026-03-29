@@ -22,12 +22,10 @@ if (!firebase.apps.length) {
 
 export const app = firebase.app();
 export const auth = firebase.auth();
-export const firestore = firebase.firestore();
 
-const databaseId = env.VITE_FIREBASE_DATABASE_ID;
-if (databaseId && databaseId !== '(default)') {
-  firestore.settings({ databaseId });
-}
+const databaseId = env.VITE_FIREBASE_DATABASE_ID || '(default)';
+export const firestore = firebase.app().firestore();
+firestore.settings({ databaseId });
 
 firestore.enablePersistence().catch((err) => {
     if (err.code === 'failed-precondition') {
