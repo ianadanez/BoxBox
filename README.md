@@ -29,4 +29,4 @@ This web repo is configured to deploy only Hosting and Firestore rules/indexes.
 
 Cloud Functions for push and scheduled notifications are managed from the mobile/backend repo (`Boxbox-Mobile/functions`), not from this web repo.
 Test 
-vamo los pubes
+vamo los pube
