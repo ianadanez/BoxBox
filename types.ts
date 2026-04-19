@@ -104,6 +104,8 @@ export interface ScheduledNotification {
   title: string;
   body: string;
   scheduledAt: any; // Firestore Timestamp
+  source?: 'system' | 'manual' | string;
+  kind?: 'prediction_reminder' | 'custom' | string;
   status?: 'pending' | 'sending' | 'sent' | 'error' | 'cancelled';
   audience?: { type: 'all' | 'uids'; uids?: string[] };
   data?: Record<string, unknown>;
@@ -341,7 +343,22 @@ export interface TournamentInviteDeclinedNotification extends BaseNotification {
     tournamentName: string;
 }
 
-export type Notification = PokeNotification | ResultsNotification | PointsAdjustmentNotification | TournamentInviteNotification | TournamentInviteAcceptedNotification | TournamentInviteDeclinedNotification;
+export interface SystemBroadcastNotification extends BaseNotification {
+    type: 'system_broadcast';
+    title?: string;
+    body?: string;
+    route?: string;
+    source?: 'system' | 'manual' | string;
+}
+
+export type Notification =
+  | PokeNotification
+  | ResultsNotification
+  | PointsAdjustmentNotification
+  | TournamentInviteNotification
+  | TournamentInviteAcceptedNotification
+  | TournamentInviteDeclinedNotification
+  | SystemBroadcastNotification;
 
 
 export interface Score {

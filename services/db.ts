@@ -102,7 +102,12 @@ const applyUsernameFallback = (user: User): User => {
         return { ...user, username: userWithPotentialName.name };
     }
     if (!user.username && !userWithPotentialName.name) {
-        return { ...user, username: user.email.split('@')[0] };
+        const safeEmail = typeof user.email === 'string' ? user.email : '';
+        const safeId = typeof user.id === 'string' ? user.id : 'usuario';
+        const fallbackUsername = safeEmail.includes('@')
+          ? safeEmail.split('@')[0]
+          : safeId.slice(0, 8) || 'usuario';
+        return { ...user, username: fallbackUsername };
     }
     return user;
 };
@@ -649,17 +654,20 @@ export const db = {
           body: payload.body,
           scheduledAt: firebase.firestore.Timestamp.fromDate(payload.scheduledAt),
           status: 'pending',
+          source: 'manual',
+          kind: 'custom',
           audience: payload.audience,
           data: payload.data ?? {},
           createdBy: payload.createdBy ?? null,
           createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
   },
-  listScheduledNotifications: async (limitCount = 20): Promise<ScheduledNotification[]> => {
-      const snap = await scheduledNotificationsCol
-          .orderBy('scheduledAt', 'desc')
-          .limit(limitCount)
-          .get();
+  listScheduledNotifications: async (limitCount?: number): Promise<ScheduledNotification[]> => {
+      let query: firebase.firestore.Query = scheduledNotificationsCol.orderBy('scheduledAt', 'desc');
+      if (limitCount && limitCount > 0) {
+          query = query.limit(limitCount);
+      }
+      const snap = await query.get();
       return snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as ScheduledNotification) }));
   },
   cancelScheduledNotification: async (id: string): Promise<void> => {
@@ -1320,77 +1328,22 @@ export const db = {
       return docSnap.exists ? docSnap.data() as OfficialResult : undefined;
   },
   publishSessionResults: async (gpId: number, session: 'quali' | 'sprint' | 'race', sessionResults: Partial<Result>, manualOverrides: Partial<OfficialResult['manualOverrides']>) => {
-    const [resultsCol, scheduleCol, predictionsCol] = await Promise.all([
-        getSeasonCollection('results'),
-        getSeasonCollection('schedule'),
-        getSeasonCollection('predictions')
-    ]);
-    if (!resultsCol || !scheduleCol || !predictionsCol) return;
+    const resultsCol = await getSeasonCollection('results');
+    if (!resultsCol) return;
 
-    const batch = firestore.batch();
     const resultRef = resultsCol.doc(String(gpId));
-    
-    batch.set(resultRef, {
+    await resultRef.set({
         ...sessionResults, gpId, publishedAt: new Date().toISOString(),
         publishedSessions: firebase.firestore.FieldValue.arrayUnion(session) as any,
         manualOverrides
     }, { merge: true });
-    
-    const gpSnap = await scheduleCol.doc(String(gpId)).get();
-    const gpName = gpSnap.exists ? (gpSnap.data() as GrandPrix).name : `GP ${gpId}`;
-
-    const predictionsSnap = await predictionsCol.where("gpId", "==", gpId).get();
-    const userIds = [...new Set(predictionsSnap.docs.map(p => (p.data() as Prediction).userId))];
-
-    for (const userId of userIds) {
-        const notifRef = notificationsCol.doc();
-        const notification: ResultsNotification = {
-            id: notifRef.id, toUserId: userId, type: 'results', gpId, gpName, session,
-            timestamp: new Date().toISOString(), seen: false,
-        };
-        batch.set(notifRef, notification);
-    }
-    
-    await batch.commit();
   },
   publishResult: async (result: OfficialResult): Promise<void> => {
-    const [resultsCol, scheduleCol, predictionsCol] = await Promise.all([
-        getSeasonCollection('results'),
-        getSeasonCollection('schedule'),
-        getSeasonCollection('predictions')
-    ]);
-    if (!resultsCol || !scheduleCol || !predictionsCol) return;
+    const resultsCol = await getSeasonCollection('results');
+    if (!resultsCol) return;
 
-    const batch = firestore.batch();
     const resultRef = resultsCol.doc(String(result.gpId));
-
-    const existingResultSnap = await resultRef.get();
-    const existingSessions = (existingResultSnap.data() as OfficialResult | undefined)?.publishedSessions || [];
-    const newSessions = result.publishedSessions.filter(s => !existingSessions.includes(s));
-
-    batch.set(resultRef, result, { merge: true });
-
-    if (newSessions.length > 0) {
-        const gpSnap = await scheduleCol.doc(String(result.gpId)).get();
-        const gpName = gpSnap.exists ? (gpSnap.data() as GrandPrix).name : `GP ${result.gpId}`;
-
-        const predictionsSnap = await predictionsCol.where("gpId", "==", result.gpId).get();
-        const userIds = [...new Set(predictionsSnap.docs.map(p => p.data().userId as string))];
-
-        for (const session of newSessions) {
-            for (const userId of userIds) {
-                const notifRef = notificationsCol.doc();
-                const notification: ResultsNotification = {
-                    id: notifRef.id, toUserId: userId, type: 'results', gpId: result.gpId, gpName, session,
-                    timestamp: new Date().toISOString(), seen: false,
-                };
-                batch.set(notifRef, notification);
-            }
-        }
-    }
-    await batch.commit();
-    // Refresh GP public standings for this GP.
-    await db.publishPublicGpStandings(result.gpId);
+    await resultRef.set(result, { merge: true });
   },
 
 

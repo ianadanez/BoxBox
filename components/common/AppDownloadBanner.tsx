@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useOptionalAuth } from '../../contexts/AuthContext';
 import {
   detectViewerPlatform,
   getAndroidApkUrl,
@@ -11,7 +11,8 @@ const BANNER_VERSION = 'v1';
 const DISMISS_KEY = `boxbox_download_banner_dismissed_${BANNER_VERSION}`;
 
 const AppDownloadBanner: React.FC = () => {
-  const { user } = useAuth();
+  const auth = useOptionalAuth();
+  const userId = auth?.user?.id ?? null;
   const location = useLocation();
   const navigate = useNavigate();
   const [dismissed, setDismissed] = useState<boolean>(() => {
@@ -37,7 +38,7 @@ const AppDownloadBanner: React.FC = () => {
       viewerPlatform,
       source: 'global_download_banner',
       pagePath,
-      userId: user?.id ?? null,
+      userId,
     });
   };
 
@@ -48,7 +49,7 @@ const AppDownloadBanner: React.FC = () => {
       viewerPlatform,
       source: 'global_download_banner',
       pagePath,
-      userId: user?.id ?? null,
+      userId,
     });
     navigate('/app-download');
   };

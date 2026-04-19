@@ -57,6 +57,16 @@ const createEmptyTemplate = (index: number): ReminderTemplate => ({
     weight: 1,
 });
 
+const getScheduledCategory = (item: ScheduledNotification): 'reminder' | 'manual' => {
+    const source = item.source ?? (item.data as any)?.source;
+    const kind = item.kind ?? (item.data as any)?.kind;
+    if (source === 'system' || kind === 'prediction_reminder') return 'reminder';
+    return 'manual';
+};
+
+const getScheduledCategoryLabel = (item: ScheduledNotification): string =>
+    getScheduledCategory(item) === 'reminder' ? 'Recordatorio automático' : 'Creada manualmente';
+
 const NotificationsManagement: React.FC = () => {
     const { user } = useAuth();
     const [settings, setSettings] = useState<NotificationSettings>(DEFAULT_SETTINGS);
@@ -75,6 +85,7 @@ const NotificationsManagement: React.FC = () => {
 
     const [scheduledItems, setScheduledItems] = useState<ScheduledNotification[]>([]);
     const [loadingScheduled, setLoadingScheduled] = useState(true);
+    const [scheduledFilter, setScheduledFilter] = useState<'all' | 'reminder' | 'manual'>('all');
     const [refreshKey, setRefreshKey] = useState(0);
 
     useEffect(() => {
@@ -90,12 +101,17 @@ const NotificationsManagement: React.FC = () => {
     useEffect(() => {
         const loadScheduled = async () => {
             setLoadingScheduled(true);
-            const items = await db.listScheduledNotifications(30);
+            const items = await db.listScheduledNotifications();
             setScheduledItems(items);
             setLoadingScheduled(false);
         };
         loadScheduled();
     }, [refreshKey]);
+
+    const filteredScheduledItems = scheduledItems.filter((item) => {
+        if (scheduledFilter === 'all') return true;
+        return getScheduledCategory(item) === scheduledFilter;
+    });
 
     useEffect(() => {
         if (audienceType !== 'uids') {
@@ -520,10 +536,28 @@ const NotificationsManagement: React.FC = () => {
             </div>
 
             <div className="bg-[var(--background-medium)] p-6 rounded-lg border border-[var(--border-color)]">
-                <h2 className="text-2xl font-bold f1-red-text mb-4">Notificaciones programadas</h2>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                    <h2 className="text-2xl font-bold f1-red-text">Notificaciones programadas</h2>
+                    <div className="flex items-center gap-2">
+                        <label className="text-sm text-[var(--text-secondary)]">Filtro</label>
+                        <select
+                            value={scheduledFilter}
+                            onChange={(e) => setScheduledFilter(e.target.value as 'all' | 'reminder' | 'manual')}
+                            className="bg-[var(--background-light)] border border-[var(--border-color)] rounded-md px-2 py-1 text-sm"
+                        >
+                            <option value="all">Todas ({scheduledItems.length})</option>
+                            <option value="reminder">
+                                Recordatorios ({scheduledItems.filter((item) => getScheduledCategory(item) === 'reminder').length})
+                            </option>
+                            <option value="manual">
+                                Manuales ({scheduledItems.filter((item) => getScheduledCategory(item) === 'manual').length})
+                            </option>
+                        </select>
+                    </div>
+                </div>
                 {loadingScheduled ? (
                     <p className="text-[var(--text-secondary)]">Cargando...</p>
-                ) : scheduledItems.length === 0 ? (
+                ) : filteredScheduledItems.length === 0 ? (
                     <p className="text-[var(--text-secondary)]">No hay notificaciones programadas.</p>
                 ) : (
                     <div className="overflow-x-auto">
@@ -531,6 +565,7 @@ const NotificationsManagement: React.FC = () => {
                             <thead className="bg-[var(--background-light)]">
                                 <tr>
                                     <th className="p-3">Título</th>
+                                    <th className="p-3">Tipo</th>
                                     <th className="p-3">Estado</th>
                                     <th className="p-3">Entrega</th>
                                     <th className="p-3">Programada</th>
@@ -540,9 +575,10 @@ const NotificationsManagement: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {scheduledItems.map(item => (
+                                {filteredScheduledItems.map(item => (
                                     <tr key={item.id} className="border-b border-[var(--border-color)]">
                                         <td className="p-3 font-medium">{item.title}</td>
+                                        <td className="p-3 text-sm text-[var(--text-secondary)]">{getScheduledCategoryLabel(item)}</td>
                                         <td className="p-3 text-sm text-[var(--text-secondary)]">{item.status ?? 'pending'}</td>
                                         <td className="p-3 text-sm text-[var(--text-secondary)]">
                                             {formatDeliveryStatus(item)}

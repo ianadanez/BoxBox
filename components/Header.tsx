@@ -82,6 +82,16 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ notificatio
                      return { emoji: '✅', content: <><span className="font-bold">{fromUser?.username || 'Alguien'}</span> ha aceptado tu invitación a <span className="font-bold">{n.tournamentName}</span>.</> };
                 case 'tournament_invite_declined':
                     return { emoji: '❌', content: <><span className="font-bold">{fromUser?.username || 'Alguien'}</span> ha rechazado tu invitación a <span className="font-bold">{n.tournamentName}</span>.</> };
+                case 'system_broadcast':
+                    return {
+                        emoji: '📣',
+                        content: (
+                            <>
+                                {n.title && <span className="font-bold">{n.title} </span>}
+                                {n.body || 'Tienes una nueva notificación.'}
+                            </>
+                        ),
+                    };
                 default:
                     return { emoji: '🔔', content: <>Tienes una nueva notificación.</> };
             }
@@ -109,6 +119,8 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ notificatio
             case 'tournament_invite_accepted':
             case 'tournament_invite_declined':
                  return `/tournaments`;
+            case 'system_broadcast':
+                return typeof n.route === 'string' && n.route.trim() ? n.route : '/';
             default:
                 return null;
         }

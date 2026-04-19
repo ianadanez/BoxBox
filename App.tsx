@@ -28,6 +28,7 @@ const OffSeasonPage = React.lazy(() => import('./pages/OffSeasonPage'));
 const SeasonWrappedPage = React.lazy(() => import('./pages/SeasonWrappedPage'));
 const LeaderboardPage = React.lazy(() => import('./pages/LeaderboardPage'));
 const AppDownloadPage = React.lazy(() => import('./pages/AppDownloadPage'));
+const CalendarPage = React.lazy(() => import('./pages/CalendarPage'));
 
 const PrivateRoute: React.FC<{ children: React.ReactNode, adminOnly?: boolean }> = ({ children, adminOnly = false }) => {
     const { user, loading } = useAuth();
@@ -65,6 +66,7 @@ const AppRoutes: React.FC = () => {
             <Route path="/profile/:userId" element={<ProfilePage />} />
             <Route path="/how-to-play" element={<HowToPlayPage />} />
             <Route path="/leaderboard" element={<LeaderboardPage />} />
+            <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/app-download" element={<AppDownloadPage />} />
             <Route path="/predict/:gpId" element={<PrivateRoute><PredictionsPage /></PrivateRoute>} />
             <Route path="/tournaments" element={<PrivateRoute><TournamentsPage /></PrivateRoute>} />

@@ -3,9 +3,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 
 interface CountdownProps {
   targetDate: string;
+  compact?: boolean;
+  className?: string;
 }
 
-const Countdown: React.FC<CountdownProps> = ({ targetDate }) => {
+const Countdown: React.FC<CountdownProps> = ({ targetDate, compact = false, className = '' }) => {
   const calculateTimeLeft = useCallback(() => {
     const difference = +new Date(targetDate) - +new Date();
     let timeLeft = {
@@ -47,16 +49,20 @@ const Countdown: React.FC<CountdownProps> = ({ targetDate }) => {
     const value = timeLeft[interval as keyof typeof timeLeft];
     if (value > 0 || timerComponents.length > 0 || interval === 'segundos') {
       timerComponents.push(
-        <div key={interval} className="flex flex-col items-center mx-2">
-            <span className="text-3xl md:text-5xl font-semibold text-[var(--text-primary)] tabular-nums">{String(value).padStart(2, '0')}</span>
-            <span className="text-xs uppercase text-[var(--text-secondary)] tracking-widest">{interval}</span>
+        <div key={interval} className={`${compact ? 'mx-1.5' : 'mx-2'} flex flex-col items-center`}>
+            <span className={`${compact ? 'text-2xl md:text-4xl' : 'text-3xl md:text-5xl'} font-semibold text-[var(--text-primary)] tabular-nums`}>
+              {String(value).padStart(2, '0')}
+            </span>
+            <span className={`${compact ? 'text-[10px]' : 'text-xs'} uppercase text-[var(--text-secondary)] tracking-widest`}>
+              {interval}
+            </span>
         </div>
       );
     }
   });
 
   return (
-    <div className="flex justify-center">
+    <div className={`flex justify-center ${className}`}>
       {timerComponents.length ? timerComponents : <span className="text-2xl font-bold text-[var(--text-primary)]">¡El evento ha comenzado!</span>}
     </div>
   );
