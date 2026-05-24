@@ -1466,10 +1466,9 @@ export const db = {
 
   // Notifications & Invites
   listenForNotificationsForUser: (userId: string, onUpdate: (notifications: Notification[]) => void): () => void => {
-      const q = notificationsCol.where("toUserId", "==", userId).limit(30);
+      const q = notificationsCol.where("toUserId", "==", userId).orderBy("timestamp", "desc").limit(30);
       const unsubscribe = q.onSnapshot(snapshot => {
           const notifications = snapshot.docs.map(doc => doc.data() as Notification);
-          notifications.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
           onUpdate(notifications.slice(0, 20));
       }, err => {
           console.error("Error listening for notifications:", err);
