@@ -12,7 +12,7 @@ export type DownloadEventName =
 
 const DOWNLOAD_SESSION_KEY = 'boxbox_download_session_id';
 const DEFAULT_ANDROID_APK_URL =
-  'https://github.com/ianadanez/boxbox-downloads/releases/latest/download/boxbox-android.apk';
+  'https://github.com/ianadanez/BoxBoxMobile/releases/download/v1.0.1/BoxBox.1.0.1.apk';
 
 export const getAndroidApkUrl = (): string =>
   (((import.meta as any).env?.VITE_ANDROID_APK_URL as string) || DEFAULT_ANDROID_APK_URL).trim();
