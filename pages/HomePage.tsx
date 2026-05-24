@@ -306,7 +306,7 @@ const HomePage: React.FC = () => {
                   {data.upcomingGps.map((gp) => (
                     <Link
                       key={gp.id}
-                      to="/calendar"
+                      to={`/gp/${gp.id}`}
                       className="block rounded-2xl border border-[var(--border-color)] bg-[var(--background-light)] p-4 transition-colors hover:border-[var(--accent-red)]"
                     >
                       <div className="flex items-start justify-between gap-3">
