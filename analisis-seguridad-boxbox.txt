@@ -1,0 +1,182 @@
+================================================================================
+ANÁLISIS DE SEGURIDAD — BoxBox
+================================================================================
+App de predicciones de F1 (React + Vite + Firebase: Firestore, Auth) y Cloud
+Functions.
+Fecha del análisis: 2026-06-10
+================================================================================
+
+RESUMEN GENERAL
+--------------------------------------------------------------------------------
+El modelo de seguridad descansa casi por completo en las reglas de Firestore,
+porque la lógica de negocio (scoring, plazos, control de admin) corre en el
+cliente. Ahí está el problema: varias reglas son demasiado permisivas y permiten
+saltarse esas validaciones llamando al SDK de Firebase directamente.
+
+
+================================================================================
+CRÍTICAS
+================================================================================
+
+[1] ESCALADA DE PRIVILEGIOS A ADMIN
+    (cualquier usuario puede hacerse administrador)
+--------------------------------------------------------------------------------
+En firestore.rules, la colección de usuarios permite:
+
+    match /users/{userId} {
+      allow write: if isOwner(userId) || isAdmin();
+    }
+
+No hay validación de campos. Como saveUser() (services/db.ts:519) hace un
+set(..., { merge: true }) con el objeto completo del usuario —incluido role—
+cualquier usuario autenticado puede escribir en su propio documento
+{ role: "admin" }.
+
+Y como isAdmin() se decide leyendo role desde ESE MISMO documento del usuario:
+
+    function isAdmin() {
+      return ... get(.../users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+…el atacante se autoasciende y obtiene control total: escribir resultados
+oficiales, ajustar puntos, modificar temporadas, settings, borrar predicciones
+de otros, etc. Es la vulnerabilidad más grave.
+
+FIX: impedir que el usuario cambie su propio role (y otros campos sensibles) en
+las reglas:
+
+    allow update: if isOwner(userId)
+                  && request.resource.data.role == resource.data.role;
+    allow create: if isOwner(userId) && request.resource.data.role == 'user';
+    // y mantener allow write para isAdmin() por separado
+
+
+[2] SIN CONTROL DE PLAZOS EN EL SERVIDOR
+    (trampas en las predicciones)
+--------------------------------------------------------------------------------
+La regla de predicciones solo verifica la propiedad, no la fecha límite:
+
+    match /seasons/{seasonId}/predictions/{predictionId} {
+      allow create, update: if isSignedIn()
+                            && request.resource.data.userId == request.auth.uid;
+    }
+
+El "bloqueo" antes de la quali/carrera (engine.getLockStatus, engine.ts:9) se
+calcula SOLO en el cliente (PredictionsPage.tsx:65). Un usuario puede llamar a
+savePrediction directamente con el SDK DESPUÉS de que empiece la sesión —o
+incluso después de conocer los resultados— y registrar una predicción perfecta.
+Rompe por completo la integridad del juego.
+
+FIX: mover el plazo a algo verificable por el servidor. Opciones: validar contra
+la fecha del GP en las reglas (las reglas pueden leer el doc del schedule y
+comparar con request.time), o canalizar el guardado de predicciones por una
+Cloud Function que valide el deadline y bloquear la escritura directa del
+cliente.
+
+NOTA RELACIONADA: las predicciones son legibles por todos.
+allow read: if isSignedIn() permite a cualquiera leer las predicciones ajenas
+ANTES del cierre. El comentario dice "open game" (intencional), pero combinado
+con el punto 2 facilita copiar predicciones rivales antes de la carrera. Si el
+diseño busca que sean secretas hasta el cierre, hay que restringir lectura por
+deadline/propietario.
+
+
+================================================================================
+MEDIAS
+================================================================================
+
+[3] NOTIFICACIONES FALSIFICABLES Y SPAM
+--------------------------------------------------------------------------------
+    match /notifications/{notificationId} {
+      allow create: if isSignedIn();
+    }
+
+No valida fromUserId == request.auth.uid ni limita el destinatario. Cualquier
+usuario puede crear notificaciones suplantando a otro remitente y enviar spam
+masivo (pokes/invitaciones) a cualquier toUserId.
+
+FIX:
+    allow create: if isSignedIn()
+                  && request.resource.data.fromUserId == request.auth.uid;
+    // y validar la forma del documento.
+
+
+[4] TORNEOS CON creatorId ARBITRARIO
+--------------------------------------------------------------------------------
+    allow create: if isSignedIn();
+
+En el create no se exige request.resource.data.creatorId == request.auth.uid,
+así que se puede crear un torneo atribuido a otra persona. (El update sí lo
+protege, pero el create no.)
+
+FIX: añadir la validación de creatorId en el create.
+
+
+[5] DEPENDENCIAS CARGADAS DESDE CDN SIN INTEGRIDAD
+    (riesgo de cadena de suministro)
+--------------------------------------------------------------------------------
+index.html carga React, Firebase, react-router y @google/genai en runtime vía
+importmap desde esm.sh, más Tailwind desde cdn.tailwindcss.com. No hay SRI ni
+CSP. Si esos CDN se ven comprometidos o secuestrados, se ejecuta código
+arbitrario en todos tus usuarios. Además, Tailwind por CDN es modo desarrollo,
+no recomendado para producción.
+
+FIX: empaquetar dependencias con Vite (ya está configurado), añadir una
+Content-Security-Policy y evitar cdn.tailwindcss.com en producción.
+
+
+================================================================================
+BAJAS / HIGIENE
+================================================================================
+
+- HOSTING SIRVE LA RAÍZ DEL PROYECTO (firebase.json: "public": ".").
+  Eso expone el código fuente .ts/.tsx, firestore.rules, migrate-data.cjs,
+  package.json, etc. como archivos servibles. Conviene servir solo dist/
+  ("public": "dist").
+
+- EVENTOS DE TRACKING SIN RATE-LIMITING (ad_events, download_events):
+  las reglas validan bien la forma del documento (incluido
+  createdAt == request.time), pero un cliente puede inflar impresiones/clics sin
+  límite y ensuciar tus analíticas.
+
+- FUNCIÓN DESPLEGADA OBSOLETA: functions/lib/index.js aún contiene
+  processRaceResults (compilado de una versión vieja) que NO valida context.auth,
+  aunque el index.ts actual ya no la exporta. Si sigue desplegada, cualquiera
+  podría invocarla. Conviene redeployar para eliminar la función huérfana y
+  verificar con firebase functions:list.
+
+- populateSeasonSchedule solo exige estar autenticado (context.auth), sin
+  comprobar rol admin — el propio comentario lo admite ("you might want to add
+  role-based access control later"). Debería requerir admin.
+
+
+================================================================================
+COSAS BIEN HECHAS
+================================================================================
+
+- La apiKey de Firebase se lee de variables de entorno; no es un secreto y su
+  exposición en el bundle es normal en apps web Firebase.
+- serviceAccountKey.json y .env están en .gitignore; no se encontraron secretos
+  hardcodeados.
+- Se exige verificación de email antes de entrar (AuthContext.tsx).
+- monitoring.ts sanea y trunca bien los datos de error antes de persistirlos.
+- Reservas de username con transacción para evitar duplicados.
+- Validación estricta de esquema en las reglas de ad_events/download_events.
+
+
+================================================================================
+PRIORIDADES
+================================================================================
+
+1. Bloquear el cambio de role en las reglas de users
+   (arregla la escalada a admin).
+2. Aplicar el deadline de predicciones en el servidor
+   (reglas o Cloud Function).
+3. Validar fromUserId/creatorId en notificaciones y torneos.
+4. Empaquetar dependencias + CSP; servir solo dist/; limpiar la función
+   obsoleta.
+
+Los dos primeros son los realmente urgentes: con cualquiera de ellos abierto, el
+juego es manipulable de extremo a extremo.
+
+================================================================================
